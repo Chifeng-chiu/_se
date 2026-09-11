@@ -13,6 +13,6 @@
 開啟終端機，並在當前目錄下執行以下指令：
 
 1. **基本網頁抓取測試：**
-   ```bash
-  python my_curl.py "https://statsapi.mlb.com/api/v1/schedule?sportId=1&teamId=119&date=2026-09-11" ```
+   ```bash python my_curl.py "https://statsapi.mlb.com/api/v1/schedule?sportId=1&teamId=119&date=2026-09-11" ```
+
   
