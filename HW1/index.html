@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>my_curl.py - Python ?賭誘?雯頝航?瘙極??/title>
+    <title>my_curl.py - Python 命令列網路請求工具</title>
     <style>
         * {
             margin: 0;
@@ -166,146 +166,146 @@
 <body>
 
 <header>
-    <div class="badge">?曆誨頠?撌亦? 繚 雿平銝</div>
+    <div class="badge">現代軟體工程 · 作業一</div>
     <h1>my<span>_</span>curl.py</h1>
-    <p>隞?Python ?批遣憟辣 <code>urllib</code> ??<code>argparse</code> 撖虫??????賭誘?雯頝航?瘙極?瘀?璅⊥?箸 curl ?嚗蒂?批遣 MLB 鞈賜? JSON ?寡ˊ閫???具?/p>
+    <p>以 Python 內建套件 <code>urllib</code> 與 <code>argparse</code> 實作的輕量級命令列網路請求工具，模擬基本 curl 功能，並內建 MLB 賽程 JSON 特製解析器。</p>
 </header>
 
 <div class="container">
 
     <div class="section">
-        <h2>撠?蝪∩?</h2>
-        <p>?砍?獢?雿輻隞颱?蝚砌??孵?隞塚??誑 Python 璅??賢?摨急????陛?? <strong>curl ?蹂誨撌亙</strong>?鈭??HTTP 隢????雯??憪Ⅳ憭???? <a href="https://statsapi.mlb.com" target="_blank" rel="noopener">MLB 摰鞈賜? API</a> ?????JSON ?脰??芸?閫???????脤????/p>
-        <p style="margin-top:10px;">??函??? OpenCode 頛摰?嚗項???賭誘???貉身閮閮?Header ??HTTP ?寞??隤日???誑??JSON 蝯?閫????/p>
+        <h2>專案簡介</h2>
+        <p>本專案不使用任何第三方套件，僅以 Python 標準函式庫打造一個簡易的 <strong>curl 替代工具</strong>。除了發送 HTTP 請求與抓取網頁原始碼外，還具備對 <a href="https://statsapi.mlb.com" target="_blank" rel="noopener">MLB 官方賽程 API</a> 回傳的冗長 JSON 進行自動解析與排版的進階功能。</p>
+        <p style="margin-top:10px;">開發全程透過 OpenCode 輔助完成，涵蓋：命令列參數設計、自訂 Header 與 HTTP 方法、錯誤防呆處理、以及 JSON 結構解析。</p>
     </div>
 
     <div class="section">
-        <h2>?詨??</h2>
+        <h2>核心功能</h2>
         <div class="grid">
             <div class="card">
-                <span class="icon">??</span>
-                <h4>??蝬脤? HTML</h4>
-                <p>?潮?皞?GET 隢?嚗?亙??喟雯??憪Ⅳ??/p>
+                <span class="icon">🌐</span>
+                <h4>抓取網頁 HTML</h4>
+                <p>發送標準 GET 請求，直接回傳網頁原始碼。</p>
             </div>
             <div class="card">
-                <span class="icon">??</span>
-                <h4>銝脫 API 皜祈岫</h4>
-                <p>?賡??拇?嗡蒂憿舐內隡箸??典??喟? JSON 鞈???/p>
+                <span class="icon">🔗</span>
+                <h4>串接 API 測試</h4>
+                <p>能順利接收並顯示伺服器回傳的 JSON 資料。</p>
             </div>
             <div class="card">
-                <span class="icon">?儭?/span>
-                <h4>?脣??航炊??</h4>
-                <p>?? HTTPError ??URLError嚗?箸?蝷箄?撏拇蔑??/p>
+                <span class="icon">🛡️</span>
+                <h4>防呆錯誤處理</h4>
+                <p>捕捉 HTTPError 與 URLError，印出提示而不崩潰。</p>
             </div>
             <div class="card">
-                <span class="icon">??</span>
-                <h4>?寡ˊ JSON 閫??</h4>
-                <p>?蕪? MLB 鞈賜? JSON嚗??箇閬箇?蝝?摮?勗?銵具?/p>
+                <span class="icon">📋</span>
+                <h4>特製 JSON 解析</h4>
+                <p>過濾冗長 MLB 賽程 JSON，轉為直覺的純文字播報列表。</p>
             </div>
         </div>
     </div>
 
     <div class="section">
-        <h2>?賭誘????/h2>
+        <h2>命令列參數</h2>
         <table>
             <tr>
-                <th>?</th>
-                <th>隤芣?</th>
-                <th>蝭?</th>
+                <th>參數</th>
+                <th>說明</th>
+                <th>範例</th>
             </tr>
             <tr>
                 <td><span class="option">url</span></td>
-                <td>閬?瘙?蝬脣?嚗?憛恬?</td>
+                <td>要請求的網址（必填）</td>
                 <td><span class="option">https://example.com</span></td>
             </tr>
             <tr>
                 <td><span class="option">-v, --verbose</span></td>
-                <td>憿舐內隢?????閰喟敦鞈?嚗eader???Ⅳ蝑?</td>
+                <td>顯示請求與回應的詳細資訊（Header、狀態碼等）</td>
                 <td><span class="option">-v</span></td>
             </tr>
             <tr>
                 <td><span class="option">-X, --request</span></td>
-                <td>?? HTTP ?寞?嚗ET?OST?UT?ELETE?佗?</td>
+                <td>指定 HTTP 方法（GET、POST、PUT、DELETE…）</td>
                 <td><span class="option">-X POST</span></td>
             </tr>
             <tr>
                 <td><span class="option">-H, --header</span></td>
-                <td>?芾? Header嚗??憭活嚗撘?<span class="option">key:value</span></td>
+                <td>自訂 Header，可重複多次，格式 <span class="option">key:value</span></td>
                 <td><span class="option">-H "User-Agent: mycurl"</span></td>
             </tr>
             <tr>
                 <td><span class="option">-d, --data</span></td>
-                <td>?喲?瘙????芸?閮剔 form-urlencoded嚗?/td>
+                <td>傳送請求資料（自動設為 form-urlencoded）</td>
                 <td><span class="option">-d "key=value"</span></td>
             </tr>
         </table>
     </div>
 
     <div class="section">
-        <h2>雿輻?孵?</h2>
-        <h3>????蝬脤???蝣?/h3>
+        <h2>使用方式</h2>
+        <h3>① 抓取網頁原始碼</h3>
         <div class="code-block">
-            <span class="comment"># ?箸蝬脤???</span><br>
+            <span class="comment"># 基本網頁抓取</span><br>
             python my_curl.py <span class="cmd">https://example.com</span>
         </div>
 
-        <h3>??撣?Header ?底蝝啗撓??/h3>
+        <h3>② 帶 Header 與詳細輸出</h3>
         <div class="code-block">
             python my_curl.py -v -H <span class="cmd">"User-Agent: mycurl"</span> <span class="cmd">https://example.com</span>
         </div>
 
-        <h3>??? POST 鞈?</h3>
+        <h3>③ 送出 POST 資料</h3>
         <div class="code-block">
             python my_curl.py -X POST -d <span class="cmd">"name=ccc&msg=hello"</span> <span class="cmd">https://example.com/api</span>
         </div>
     </div>
 
     <div class="section">
-        <h2>MLB 鞈賜??寡ˊ閫??</h2>
-        <p>??????鞈賜?摰 API嚗?? JSON 頧???strong>摰Ｗ VS 銝餃 | ? | ???/strong>??蝝?摮?銵具?/p>
+        <h2>MLB 賽程特製解析</h2>
+        <p>抓取道奇隊比賽的官方 API，將冗長 JSON 轉成「<strong>客場 VS 主場 | 球場 | 狀態</strong>」的純文字列表。</p>
         <div class="code-block">
-            <span class="comment"># ??銝西圾??MLB ?單?鞈賭?嚗?憟? teamId=119嚗?/span><br>
+            <span class="comment"># 抓取並解析 MLB 即時賽事（道奇隊 teamId=119）</span><br>
             python my_curl.py <span class="cmd">"https://statsapi.mlb.com/api/v1/schedule?sportId=1&amp;teamId=119&amp;date=2026-09-11"</span> | python parse_mlb.py<br><br>
-            <span class="comment"># 頛詨蝭?嚗?/span><br>
+            <span class="comment"># 輸出範例：</span><br>
             <span class="out">Colorado Rockies VS Los Angeles Dodgers | Dodger Stadium | Final</span><br>
             <span class="out">San Diego Padres VS Los Angeles Dodgers | Dodger Stadium | Scheduled</span>
         </div>
-        <p style="margin-top:8px;">?剝? <code>parse_mlb.py</code>嚗?韏啗赤 <span class="option">dates ??games</span> 蝯?嚗??箔蜓摰ａ????渲?鞈賭????摰?鞈?皜?????/p>
+        <p style="margin-top:8px;">搭配 <code>parse_mlb.py</code>，逐筆走訪 <span class="option">dates → games</span> 結構，取出主客隊、球場與賽事狀態，完成資料清洗與排版。</p>
     </div>
 
     <div class="section">
-        <h2>撠?瑼?蝯?</h2>
+        <h2>專案檔案結構</h2>
         <table>
             <tr>
-                <th>瑼?</th>
-                <th>?券?/th>
+                <th>檔案</th>
+                <th>用途</th>
             </tr>
             <tr>
                 <td><span class="option">my_curl.py</span></td>
-                <td>銝餌?撘??賭誘???貉圾??+ HTTP 隢? + ?航炊??</td>
+                <td>主程式：命令列參數解析 + HTTP 請求 + 錯誤處理</td>
             </tr>
             <tr>
                 <td><span class="option">parse_mlb.py</span></td>
-                <td>MLB 鞈賜? JSON 閫???剁??航???獢? stdin嚗?/td>
+                <td>MLB 賽程 JSON 解析器（可讀取檔案或 stdin）</td>
             </tr>
             <tr>
                 <td><span class="option">README.md</span></td>
-                <td>撠?隤芣??辣</td>
+                <td>專案說明文件</td>
             </tr>
         </table>
     </div>
 
     <div class="section">
-        <h2>??蝣潮?暺?/h2>
+        <h2>原始碼重點</h2>
         <ul>
-            <li><strong>?閫??嚗?/strong>雿輻 <span class="option">argparse</span> 摰儔 <span class="option">url</span>??span class="option">-v</span>??span class="option">-X</span>??span class="option">-H</span>??span class="option">-d</span>嚗銝?<span class="option">-H</span> 隞?<span class="option">append</span> ?舀??雿輻??/li>
-            <li><strong>隢?撱箸?嚗?/strong>閫?? <span class="option">-H</span> ??dict嚗? <span class="option">-d</span> ???銝?<span class="option">Content-Type: application/x-www-form-urlencoded</span>??/li>
-            <li><strong>Verbose 璅∪?嚗?/strong>隞?<span class="option">&gt;</span> 頛詨隢???span class="option">&lt;</span> 頛詨??嚗芋??curl ??<span class="option">-v</span> 憿舐內?澆???/li>
-            <li><strong>?航炊?脣?嚗?/strong>??? <span class="option">HTTPError</span>嚗?xx/5xx嚗? <span class="option">URLError</span>嚗瘜??嚗?撖怠 <span class="option">stderr</span> 銝血??喲??嗥??Ⅳ??/li>
+            <li><strong>參數解析：</strong>使用 <span class="option">argparse</span> 定義 <span class="option">url</span>、<span class="option">-v</span>、<span class="option">-X</span>、<span class="option">-H</span>、<span class="option">-d</span>，其中 <span class="option">-H</span> 以 <span class="option">append</span> 支援重複使用。</li>
+            <li><strong>請求建構：</strong>解析 <span class="option">-H</span> 為 dict，有 <span class="option">-d</span> 時自動補上 <span class="option">Content-Type: application/x-www-form-urlencoded</span>。</li>
+            <li><strong>Verbose 模式：</strong>以 <span class="option">&gt;</span> 輸出請求、<span class="option">&lt;</span> 輸出回應，模擬 curl 的 <span class="option">-v</span> 顯示格式。</li>
+            <li><strong>錯誤防呆：</strong>分別捕捉 <span class="option">HTTPError</span>（4xx/5xx）與 <span class="option">URLError</span>（無法連線），寫入 <span class="option">stderr</span> 並回傳非零結束碼。</li>
         </ul>
     </div>
 
-    <div class="footer-note">?曆誨頠?撌亦?隤脩? 繚 my_curl.py 撠??</div>
+    <div class="footer-note">現代軟體工程課程 · my_curl.py 專案頁面</div>
 
 </div>
 
