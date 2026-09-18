@@ -216,3 +216,11 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Node / React
+node_modules/
+npm-debug.log*
+yarn-error.log*
+
+# HW2 database
+**/backend/data/*.db
