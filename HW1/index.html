@@ -24,6 +24,7 @@
             border-radius: 5px;
             font-family: 'Courier New', Courier, monospace;
             overflow-x: auto;
+            margin-bottom: 10px;
         }
         .demo-image {
             max-width: 100%;
@@ -48,23 +49,19 @@
     <p>現代軟體工程課程紀錄，使用 OpenCode 輔助開發一個輕量級的網路請求工具。</p>
 
     <div class="section">
-        <h2>Phase 1: 基礎網頁抓取</h2>
-        <p>首先，我讓程式能夠送出最基本的 GET 請求，成功抓回了 <code>example.com</code> 的 HTML 原始碼。</p>
+        <h2>執行成果展示 (Demo)</h2>
+        <p>這支程式具備兩個核心能力：首先，能精準抓取指定網址（例如 example.com）的 HTML 原始碼。其次，它內建了客製化的 JSON 解析器，能將 MLB 官方 API 冗長的原始資料，自動過濾並轉換為乾淨易讀的純文字賽程播報列表。</p>
+        
+        <p><strong>使用的測試指令：</strong></p>
         <div class="code-block">
-            python my_curl.py https://example.com
-        </div>
-        <!-- 記得把你的第一張截圖放在同一個資料夾，並更改檔名 -->
-        <img src="demo.png" alt="基礎網頁抓取成功" class="demo-image">
-    </div>
-
-    <div class="section">
-        <h2>Phase 2: 實戰應用 - 抓取 MLB 道奇隊賽程</h2>
-        <p>為了測試進階功能，我使用了 MLB 官方的 API，並透過 OpenCode 修改程式碼，將原本雜亂的 JSON 資料，自動轉換成易讀的賽程播報列表。</p>
-        <div class="code-block">
+            # 測試一：抓取網頁原始碼<br>
+            python my_curl.py https://example.com<br><br>
+            # 測試二：抓取並解析 MLB 即時賽事 (道奇隊)<br>
             python my_curl.py "https://statsapi.mlb.com/api/v1/schedule?sportId=1&teamId=119&date=2026-09-11"
         </div>
-        <!-- 記得把你的第二張截圖放在同一個資料夾，並更改檔名 -->
-        <img src="mlb_demo.png" alt="MLB 賽事解析成功" class="demo-image">
+        
+        <!-- 這裡已經幫你把 img src 換成你剛剛上傳的檔名了 -->
+        <img src="image_a941a9.png" alt="終端機執行成果截圖" class="demo-image">
     </div>
 
 </body>
