@@ -1,1 +1,71 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Curl 開發日誌</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f9f9f9;
+        }
+        h1, h2 {
+            color: #2c3e50;
+        }
+        .code-block {
+            background-color: #2d2d2d;
+            color: #ccc;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: 'Courier New', Courier, monospace;
+            overflow-x: auto;
+        }
+        .demo-image {
+            max-width: 100%;
+            height: auto;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            margin: 20px 0;
+        }
+        .section {
+            background-color: #fff;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+    </style>
+</head>
+<body>
 
+    <h1>從零開始的 Python 命令列之旅：my_curl 實作紀錄</h1>
+    <p>現代軟體工程課程紀錄，使用 OpenCode 輔助開發一個輕量級的網路請求工具。</p>
+
+    <div class="section">
+        <h2>Phase 1: 基礎網頁抓取</h2>
+        <p>首先，我讓程式能夠送出最基本的 GET 請求，成功抓回了 <code>example.com</code> 的 HTML 原始碼。</p>
+        <div class="code-block">
+            python my_curl.py https://example.com
+        </div>
+        <!-- 記得把你的第一張截圖放在同一個資料夾，並更改檔名 -->
+        <img src="demo.png" alt="基礎網頁抓取成功" class="demo-image">
+    </div>
+
+    <div class="section">
+        <h2>Phase 2: 實戰應用 - 抓取 MLB 道奇隊賽程</h2>
+        <p>為了測試進階功能，我使用了 MLB 官方的 API，並透過 OpenCode 修改程式碼，將原本雜亂的 JSON 資料，自動轉換成易讀的賽程播報列表。</p>
+        <div class="code-block">
+            python my_curl.py "https://statsapi.mlb.com/api/v1/schedule?sportId=1&teamId=119&date=2026-09-11"
+        </div>
+        <!-- 記得把你的第二張截圖放在同一個資料夾，並更改檔名 -->
+        <img src="mlb_demo.png" alt="MLB 賽事解析成功" class="demo-image">
+    </div>
+
+</body>
+</html>
