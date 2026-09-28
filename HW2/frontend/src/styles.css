@@ -324,3 +324,216 @@ ul.tree li:last-child::before {
   margin: 1px 0;
 }
 .tcell .cn { font-weight: bold; }
+
+/* ============================================================
+   登入頁
+   ============================================================ */
+.login-page {
+  height: 100vh;
+  background: #3b5598;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.login-box {
+  background: #fff;
+  border: 2px solid #000;
+  padding: 18px 22px;
+  text-align: center;
+}
+.login-title {
+  font-size: 24px;
+  font-weight: bold;
+  letter-spacing: 3px;
+}
+.login-subtitle {
+  font-size: 12px;
+  letter-spacing: 1px;
+  color: #333;
+  margin-bottom: 12px;
+}
+.login-panel {
+  border: 1px solid #999;
+  background: #eaeaea;
+  padding: 12px;
+}
+.login-head {
+  background: #3b5598;
+  color: #fff;
+  font-weight: bold;
+  padding: 4px 0;
+  margin-bottom: 10px;
+}
+.login-table {
+  margin: 0 auto;
+}
+.login-table td {
+  padding: 5px;
+}
+.login-label {
+  text-align: right;
+  white-space: nowrap;
+}
+.login-table input,
+.modal-table input {
+  font-family: "新細明體", PMingLiU, MingLiU, serif;
+  font-size: 12px;
+  border: 1px solid #808080;
+  padding: 2px 4px;
+  width: 160px;
+}
+.login-buttons {
+  margin-top: 10px;
+}
+.login-submit {
+  margin: 0 5px;
+}
+.login-error {
+  color: #cc0000;
+  margin-top: 6px;
+}
+.login-hint {
+  margin-top: 10px;
+  color: #666;
+}
+
+/* ============================================================
+   主內容區：子標題 / 動作按鈕 / 狀態列
+   ============================================================ */
+.panel-sub {
+  font-weight: bold;
+  margin: 6px 0 3px 0;
+  border-left: 4px solid #3b5598;
+  padding-left: 6px;
+}
+.action-btn {
+  font-family: "新細明體", PMingLiU, MingLiU, serif;
+  font-size: 12px;
+  border: 2px outset;
+  border-color: #ffffff #808080 #808080 #ffffff;
+  padding: 2px 10px;
+  cursor: pointer;
+}
+.action-btn:active { border-style: inset; }
+.action-btn:disabled {
+  color: #999;
+  cursor: not-allowed;
+  border-style: inset;
+}
+.action-btn.add { background: #c0c0c0; }
+.action-btn.drop { background: #c0c0c0; }
+.enrolled-tag {
+  color: #008000;
+  font-weight: bold;
+}
+.grade-summary {
+  margin-top: 4px;
+  font-weight: bold;
+}
+.status-bar {
+  border: 1px solid #999;
+  padding: 3px 6px;
+  margin-bottom: 6px;
+  position: relative;
+}
+.status-bar.ok { background: #e8f7e8; color: #005a00; }
+.status-bar.error { background: #fdecec; color: #990000; }
+.status-close {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  border: 1px solid #888;
+  background: #fff;
+  cursor: pointer;
+  line-height: 12px;
+  width: 14px;
+  height: 14px;
+}
+
+/* ============================================================
+   修改密碼 Modal
+   ============================================================ */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+.modal-box {
+  background: #eaeaea;
+  border: 2px outset #fff;
+  border-color: #fff #808080 #808080 #fff;
+  padding: 12px 16px;
+  min-width: 260px;
+}
+.modal-title {
+  font-weight: bold;
+  text-align: center;
+  margin-bottom: 10px;
+}
+.modal-table {
+  margin: 0 auto;
+}
+.modal-table td {
+  padding: 4px;
+}
+.modal-label {
+  text-align: right;
+  white-space: nowrap;
+}
+.modal-buttons {
+  text-align: center;
+  margin-top: 10px;
+}
+.modal-buttons .retro-btn {
+  margin: 0 4px;
+}
+
+/* ============================================================
+   請假系統
+   ============================================================ */
+.leave-form-table td.form-label {
+  width: 90px;
+  text-align: right;
+  font-weight: bold;
+  background: #f0f0f0;
+  white-space: nowrap;
+}
+.leave-form-table input[type="text"],
+.leave-form-table input[type="date"],
+.leave-form-table select {
+  font-family: "新細明體", PMingLiU, MingLiU, serif;
+  font-size: 12px;
+  border: 1px solid #808080;
+  padding: 2px 4px;
+}
+.leave-form-table textarea {
+  font-family: "新細明體", PMingLiU, MingLiU, serif;
+  font-size: 12px;
+  border: 1px solid #808080;
+  padding: 2px 4px;
+  width: 90%;
+  resize: none;
+}
+.leave-form-table td {
+  text-align: left;
+}
+.form-actions {
+  margin-top: 6px;
+}
+.form-actions .retro-btn {
+  margin-right: 6px;
+}
+.leave-status {
+  font-weight: bold;
+}
+.leave-status.待審核 { color: #b06000; }
+.leave-status.已核准 { color: #008000; }
+.leave-status.已駁回 { color: #cc0000; }
+.leave-status.已撤銷 { color: #888; }

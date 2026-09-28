@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>國立金門大學 校務系統 - 管理後台</title>
+<style>
+  * { margin: 0; padding: 0; border-radius: 0 !important; box-shadow: none !important; }
+  body {
+    font-family: "新細明體", PMingLiU, MingLiU, serif;
+    font-size: 12px; color: #000; background: #fff;
+    display: flex; min-height: 100vh; flex-direction: column;
+  }
+  header {
+    background: #3b5598; color: #fff; padding: 8px 14px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  header .logo { font-size: 20px; font-weight: bold; letter-spacing: 2px; }
+  header .logo-en { font-size: 12px; letter-spacing: 1px; }
+  header .admin-info { color: #ffff00; font-weight: bold; }
+  main { flex: 1; padding: 10px; background: #eaeaea; }
+  .retro-btn {
+    background: #c0c0c0; border: 2px outset; border-color: #fff #808080 #808080 #fff;
+    padding: 3px 12px; font-family: inherit; font-size: 12px; color: #000; cursor: pointer;
+  }
+  .retro-btn:active { border-style: inset; }
+  .retro-btn:disabled { color: #999; cursor: not-allowed; }
+  .retro-btn:hover { background: #d0d0d0; }
+  .retro-btn.logout { margin-left: 8px; }
+
+  .login-wrap { display: flex; align-items: center; justify-content: center; flex: 1; }
+  .login-box { background: #fff; border: 2px solid #000; padding: 18px 22px; text-align: center; }
+  .login-title { font-size: 22px; font-weight: bold; letter-spacing: 3px; }
+  .login-subtitle { font-size: 12px; color: #333; margin-bottom: 12px; }
+  .login-panel { border: 1px solid #999; background: #eaeaea; padding: 12px; }
+  .login-head { background: #3b5598; color: #fff; font-weight: bold; padding: 4px 0; margin-bottom: 10px; }
+  .login-table { margin: 0 auto; }
+  .login-table td { padding: 5px; text-align: right; }
+  .login-table input {
+    font-family: inherit; font-size: 12px; border: 1px solid #808080; padding: 2px 4px; width: 150px; text-align: left;
+  }
+  .login-error { color: #cc0000; margin-top: 6px; }
+  .login-buttons { margin-top: 10px; text-align: center; }
+  .login-hint { margin-top: 10px; color: #666; }
+
+  .toolbar { margin-bottom: 8px; display: flex; gap: 6px; align-items: center; }
+  .toolbar select {
+    font-family: inherit; font-size: 12px; border: 1px solid #808080; padding: 2px 4px;
+  }
+  .status-bar { padding: 3px 6px; margin-bottom: 8px; border: 1px solid #999; }
+  .status-bar.ok { background: #e8f7e8; color: #005a00; }
+  .status-bar.error { background: #fdecec; color: #990000; }
+
+  table.grid {
+    width: 100%; border-collapse: collapse; border: 1px solid #999; background: #fff; margin-bottom: 8px;
+  }
+  table.grid th, table.grid td {
+    border: 1px solid #999; padding: 3px; text-align: center; vertical-align: middle;
+  }
+  table.grid th { background: #e0e0e0; font-weight: normal; }
+  table.grid td.left { text-align: left; }
+  .leave-status { font-weight: bold; }
+  .s-pending { color: #b06000; }
+  .s-approved { color: #008000; }
+  .s-rejected { color: #cc0000; }
+  .s-canceled { color: #888; }
+  .action-btn {
+    font-family: inherit; font-size: 12px; border: 2px outset; border-color: #fff #808080 #808080 #fff;
+    background: #c0c0c0; padding: 2px 10px; cursor: pointer; margin: 0 2px;
+  }
+  .action-btn:active { border-style: inset; }
+  .action-btn:disabled { color: #999; cursor: not-allowed; border-style: inset; }
+  .empty { padding: 12px; color: #666; }
+  footer { padding: 6px 14px; background: #e0e0e0; border-top: 1px solid #999; color: #666; }
+</style>
+</head>
+<body>
+  <header>
+    <div>
+      <span class="logo">國立金門大學</span>　
+      <span class="logo-en">National Quemoy University</span>
+    </div>
+    <div class="admin-info" id="header-info" style="display:none;">
+      　
+    </div>
+  </header>
+
+  <!-- 登入畫面 -->
+  <div class="login-wrap" id="login-view">
+    <div class="login-box">
+      <div class="login-title">國立金門大學</div>
+      <div class="login-subtitle">National Quemoy University</div>
+      <div class="login-panel">
+        <div class="login-head">校務系統　管理後台登入</div>
+        <table class="login-table">
+          <tr><td>帳號</td><td><input type="text" id="username" autofocus></td></tr>
+          <tr><td>密碼</td><td><input type="password" id="password"></td></tr>
+        </table>
+        <div class="login-error" id="login-error"></div>
+        <div class="login-buttons">
+          <button class="retro-btn" onclick="doLogin()">登入</button>
+        </div>
+        <div class="login-hint">管理員帳號：admin　密碼：admin123</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 管理主畫面 -->
+  <main id="admin-view" style="display:none;">
+    <div class="toolbar">
+      <button class="retro-btn" onclick="loadLeaves()">重新整理</button>
+      <select id="status-filter" onchange="loadLeaves()">
+        <option value="">全部狀態</option>
+        <option value="待審核">待審核</option>
+        <option value="已核准">已核准</option>
+        <option value="已駁回">已駁回</option>
+        <option value="已撤銷">已撤銷</option>
+      </select>
+    </div>
+    <div class="status-bar" id="status-bar" style="display:none;"></div>
+    <table class="grid" id="leave-table">
+      <thead>
+        <tr>
+          <th>編號</th><th>學號</th><th>姓名</th><th>類別</th>
+          <th>開始日期</th><th>結束日期</th><th>天數</th><th>節次</th>
+          <th>事由</th><th>狀態</th><th>申請時間</th><th>審核</th>
+        </tr>
+      </thead>
+      <tbody id="leave-body">
+        <tr><td class="empty" colspan="12">資料載入中...</td></tr>
+      </tbody>
+    </table>
+  </main>
+
+  <footer>國立金門大學資訊工程系　現代軟體工程　校務系統管理後台</footer>
+
+<script>
+var TOKEN_KEY = 'nqu-admin-token';
+var USER_KEY = 'nqu-admin-user';
+
+function getToken() { return localStorage.getItem(TOKEN_KEY); }
+function setAuth(username, token, displayName) {
+  localStorage.setItem(TOKEN_KEY, token);
+  localStorage.setItem(USER_KEY, username);
+  localStorage.setItem('nqu-admin-name', displayName || username);
+}
+function clearAuth() {
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(USER_KEY);
+  localStorage.removeItem('nqu-admin-name');
+}
+
+function showMsg(text, type) {
+  var bar = document.getElementById('status-bar');
+  bar.style.display = '';
+  bar.className = 'status-bar ' + (type || 'ok');
+  bar.textContent = text;
+  setTimeout(function () { bar.style.display = 'none'; }, 4000);
+}
+
+function doLogin() {
+  var username = document.getElementById('username').value.trim();
+  var password = document.getElementById('password').value;
+  var errBox = document.getElementById('login-error');
+  errBox.textContent = '';
+  if (!username || !password) { errBox.textContent = '請輸入帳號與密碼'; return; }
+  fetch('/api/admin/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: username, password: password })
+  })
+    .then(function (r) { return r.json().then(function (j) { return { status: r.status, body: j }; }); })
+    .then(function (res) {
+      if (res.status !== 200) { errBox.textContent = res.body.message || '登入失敗'; return; }
+      setAuth(res.body.data.username, res.body.data.token, res.body.data.display_name);
+      showMain();
+      loadLeaves();
+    })
+    .catch(function () { errBox.textContent = '無法連線到後端伺服器'; });
+}
+
+function doLogout() {
+  var token = getToken();
+  if (token) {
+    fetch('/api/admin/logout', { method: 'POST', headers: { Authorization: 'Bearer ' + token } }).catch(function () {});
+  }
+  clearAuth();
+  showLogin();
+}
+
+function authHeaders() {
+  return { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + getToken() };
+}
+
+function review(leaveId, action) {
+  var url = action === 'approve' ? '/api/leave/approve' : '/api/leave/reject';
+  fetch(url, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ leave_id: leaveId })
+  })
+    .then(function (r) { return r.json().then(function (j) { return { status: r.status, body: j }; }); })
+    .then(function (res) {
+      if (res.status !== 200) {
+        showMsg(res.body.message || '操作失敗', 'error');
+      } else {
+        showMsg(res.body.message, 'ok');
+        loadLeaves();
+      }
+    })
+    .catch(function () { showMsg('無法連線到後端伺服器', 'error'); });
+}
+
+function esc(s) {
+  return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function statusClass(status) {
+  if (status === '待審核') return 's-pending';
+  if (status === '已核准') return 's-approved';
+  if (status === '已駁回') return 's-rejected';
+  return 's-canceled';
+}
+
+function loadLeaves() {
+  var status = document.getElementById('status-filter').value;
+  var q = status ? '?status=' + encodeURIComponent(status) : '';
+  var tbody = document.getElementById('leave-body');
+  tbody.innerHTML = '<tr><td class="empty" colspan="12">資料載入中...</td></tr>';
+  fetch('/api/admin/leaves' + q, { headers: authHeaders() })
+    .then(function (r) {
+      if (r.status === 401) { clearAuth(); showLogin(); throw new Error('login-expired'); }
+      return r.json().then(function (j) { return { status: r.status, body: j }; });
+    })
+    .then(function (res) {
+      if (res.status !== 200) { tbody.innerHTML = ''; showMsg(res.body.message, 'error'); return; }
+      var rows = res.body.data;
+      if (!rows.length) {
+        tbody.innerHTML = '<tr><td class="empty" colspan="12">目前沒有符合條件的請假申請</td></tr>';
+        return;
+      }
+      tbody.innerHTML = rows.map(function (l) {
+        var canReview = l.status === '待審核';
+        return '<tr>' +
+          '<td>' + l.leave_id + '</td>' +
+          '<td>' + esc(l.student_id) + '</td>' +
+          '<td>' + esc(l.student_name) + '</td>' +
+          '<td>' + esc(l.leave_type) + '</td>' +
+          '<td>' + esc(l.start_date) + '</td>' +
+          '<td>' + esc(l.end_date) + '</td>' +
+          '<td>' + esc(l.days) + '</td>' +
+          '<td>' + esc(l.periods || '-') + '</td>' +
+          '<td class="left">' + esc(l.reason) + '</td>' +
+          '<td><span class="leave-status ' + statusClass(l.status) + '">' + esc(l.status) + '</span></td>' +
+          '<td>' + esc(l.created_at) + '</td>' +
+          '<td>' + (canReview
+            ? '<button class="action-btn" onclick="review(' + l.leave_id + ', \'approve\')">核准</button>' +
+              '<button class="action-btn" onclick="review(' + l.leave_id + ', \'reject\')">駁回</button>'
+            : '-') + '</td>' +
+          '</tr>';
+      }).join('');
+    })
+    .catch(function (err) {
+      if (err.message !== 'login-expired') tbody.innerHTML = '<tr><td class="empty" colspan="12">無法載入資料</td></tr>';
+    });
+}
+
+function showLogin() {
+  document.getElementById('login-view').style.display = 'flex';
+  document.getElementById('admin-view').style.display = 'none';
+  document.getElementById('header-info').style.display = 'none';
+}
+function showMain() {
+  var name = localStorage.getItem('nqu-admin-name') || localStorage.getItem(USER_KEY) || '';
+  document.getElementById('login-view').style.display = 'none';
+  document.getElementById('admin-view').style.display = '';
+  var info = document.getElementById('header-info');
+  info.style.display = '';
+  info.innerHTML = '管理者：' + esc(name) + '<button class="retro-btn logout" onclick="doLogout()">登出</button>';
+}
+
+(function init() {
+  document.getElementById('username').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') document.getElementById('password').focus();
+  });
+  document.getElementById('password').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') doLogin();
+  });
+  if (getToken()) { showMain(); loadLeaves(); } else { showLogin(); }
+})();
+</script>
+</body>
+</html>
