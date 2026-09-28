@@ -2,13 +2,49 @@
 routes/schedule.py
 包含以下核心 API：
   1. [GET]    /api/schedule          -> 查詢個人課表 (已選上的課程)
-  2. [POST]   /api/enroll            -> 加選課程 (含重複選課與名額檢查)
+  2. [POST]   /api/enroll            -> 加選課程 (含重複選課、名額與衝堂檢查)
   3. [DELETE] /api/enroll            -> 退選課程 (軟刪除)
 """
+import re
 from flask import Blueprint, request, jsonify
 from database import query, execute
+from config import Config
 
 schedule_bp = Blueprint('schedule', __name__)
+
+# 星期字元 → 數字索引 (1 = 一 ... 7 = 日)
+DAY_INDEX = {'一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6, '日': 7}
+
+
+def parse_time(value):
+    """解析上課時間字串「(四)5-6」→ (day, start, end)；無法解析回傳 None"""
+    if not value:
+        return None
+    m = re.match(r'^\(([一二三四五六日])\)\s*(\d+)-(\d+)\s*$', str(value))
+    if not m:
+        return None
+    return (DAY_INDEX[m.group(1)], int(m.group(2)), int(m.group(3)))
+
+
+def times_conflict(a, b):
+    """兩個時間區間是否衝堂（同一天且區間重疊）"""
+    if not a or not b:
+        return False
+    if a[0] != b[0]:
+        return False
+    return not (a[2] < b[1] or b[2] < a[1])
+
+
+def get_enrolled_time_slots(student_id, semester):
+    """取得該生該學期所有已選上課程的上課時間，回傳 [(time, course_name), ...]"""
+    rows = query(
+        """SELECT c.time AS time, c.course_name AS course_name
+           FROM course_enrollments e
+           JOIN courses c ON e.course_id = c.course_id
+           WHERE e.student_id = ? AND e.semester = ? AND e.status = '已選上'""",
+        (student_id, semester)
+    )
+    return [(row['time'], row['course_name']) for row in rows if row['time']]
 
 
 @schedule_bp.route('/api/schedule', methods=['GET'])
@@ -26,11 +62,11 @@ def get_schedule():
     """
     # --- 取得並驗證參數 ---
     student_id = request.args.get('student_id')
-    semester = request.args.get('semester')
+    semester = request.args.get('semester') or Config.CURRENT_SEMESTER
 
     # 缺少必要參數時回傳 400
-    if not student_id or not semester:
-        return jsonify({'success': False, 'message': '缺少必要參數: student_id, semester'}), 400
+    if not student_id:
+        return jsonify({'success': False, 'message': '缺少必要參數: student_id'}), 400
 
     # --- 確認學生存在 ---
     student = query('SELECT * FROM students WHERE student_id = ?', (student_id,))
@@ -43,9 +79,15 @@ def get_schedule():
     sql = """
         SELECT
             e.course_id,
-            c.course_name AS course_name,   -- 課程名稱
-            c.credits    AS credits,        -- 學分
-            c.teacher    AS teacher,        -- 授課教師
+            c.course_name   AS course_name,
+            c.name_en       AS name_en,
+            c.credits       AS credits,
+            c.course_type   AS course_type,
+            c.teacher       AS teacher,
+            c.class_group   AS class_group,
+            c.group_no      AS group_no,
+            c.time          AS time,
+            c.room          AS room,
             e.semester,
             e.status
         FROM course_enrollments e
@@ -85,11 +127,11 @@ def enroll_course():
     data = request.get_json(force=True)
     student_id = data.get('student_id')
     course_id = data.get('course_id')
-    semester = data.get('semester')
+    semester = data.get('semester') or Config.CURRENT_SEMESTER
 
     # 驗證必要欄位
-    if not student_id or not course_id or not semester:
-        return jsonify({'success': False, 'message': '缺少必要欄位: student_id, course_id, semester'}), 400
+    if not student_id or not course_id:
+        return jsonify({'success': False, 'message': '缺少必要欄位: student_id, course_id'}), 400
 
     # --- 檢查 (0): 學生與課程是否存在 ---
     if not query('SELECT 1 FROM students WHERE student_id = ?', (student_id,)):
@@ -101,24 +143,41 @@ def enroll_course():
     course = course_row[0]
 
     # --- 檢查 (1): 是否已選過該課 ---
-    # 同一學生在相同學期重複加選同一門課，直接拒絕
-    duplicate = query(
-        'SELECT 1 FROM course_enrollments WHERE student_id = ? AND course_id = ? AND semester = ?',
+    # 只有「已選上」的紀錄才算重複；若僅有「退選」紀錄，之後直接復活該筆紀錄（重新加選）
+    existing_rows = query(
+        'SELECT * FROM course_enrollments WHERE student_id = ? AND course_id = ? AND semester = ?',
         (student_id, course_id, semester)
     )
-    if duplicate:
+    existing = existing_rows[0] if existing_rows else None
+    if existing and existing['status'] == '已選上':
         return jsonify({'success': False, 'message': '該學期已選過此課程，無法重複加選'}), 400
 
     # --- 檢查 (2): 名額是否已滿 ---
     if course['current_enrolled'] >= course['max_capacity']:
         return jsonify({'success': False, 'message': '課程名額已滿'}), 400
 
-    # --- 加選：新增選課記錄 ---
-    execute(
-        '''INSERT INTO course_enrollments (student_id, course_id, semester, status)
-           VALUES (?, ?, ?, '已選上')''',
-        (student_id, course_id, semester)
-    )
+    # --- 檢查 (3): 上課時間是否與已選課程衝堂 ---
+    new_time = parse_time(course.get('time'))
+    if new_time:
+        for existing_time, existing_name in get_enrolled_time_slots(student_id, semester):
+            if times_conflict(new_time, parse_time(existing_time)):
+                return jsonify({
+                    'success': False,
+                    'message': f'衝堂！此課程與「{existing_name}」的上課時間衝突'
+                }), 400
+
+    # --- 加選：新增選課記錄（或復活先前退選的紀錄）---
+    if existing:
+        execute(
+            'UPDATE course_enrollments SET status = ? WHERE enrollment_id = ?',
+            ('已選上', existing['enrollment_id'])
+        )
+    else:
+        execute(
+            '''INSERT INTO course_enrollments (student_id, course_id, semester, status)
+               VALUES (?, ?, ?, '已選上')''',
+            (student_id, course_id, semester)
+        )
 
     # --- 加選：課程已選人數 +1 ---
     execute(
@@ -164,11 +223,11 @@ def drop_course():
     data = request.get_json(force=True)
     student_id = data.get('student_id')
     course_id = data.get('course_id')
-    semester = data.get('semester')
+    semester = data.get('semester') or Config.CURRENT_SEMESTER
 
     # 驗證必要欄位
-    if not student_id or not course_id or not semester:
-        return jsonify({'success': False, 'message': '缺少必要欄位: student_id, course_id, semester'}), 400
+    if not student_id or not course_id:
+        return jsonify({'success': False, 'message': '缺少必要欄位: student_id, course_id'}), 400
 
     # --- 防呆 (1): 確認該生在此學期是否曾選過此課 ---
     enrollment_rows = query(
