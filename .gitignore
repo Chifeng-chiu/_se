@@ -224,3 +224,5 @@ yarn-error.log*
 
 # HW2 database
 **/backend/data/*.db
+*.db
+desktop.ini

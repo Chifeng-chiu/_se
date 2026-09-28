@@ -54,8 +54,30 @@ def init_db():
         )
     ''')
 
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS leave_requests (
+            leave_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            student_id VARCHAR(10) NOT NULL,
+            leave_type VARCHAR(20) NOT NULL,
+            leave_date VARCHAR(10) NOT NULL,
+            reason VARCHAR(500),
+            status VARCHAR(20) DEFAULT '審核中',
+            FOREIGN KEY (student_id) REFERENCES students(student_id)
+        )
+    ''')
+
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            user_id VARCHAR(50) PRIMARY KEY,
+            password VARCHAR(255) NOT NULL,
+            role VARCHAR(20) DEFAULT 'student'
+        )
+    ''')
+
     conn.execute('CREATE INDEX IF NOT EXISTS idx_enrollment_student ON course_enrollments(student_id)')
     conn.execute('CREATE INDEX IF NOT EXISTS idx_enrollment_course ON course_enrollments(course_id)')
+    conn.execute('CREATE INDEX IF NOT EXISTS idx_leave_status ON leave_requests(status)')
+    conn.execute('CREATE INDEX IF NOT EXISTS idx_leave_student ON leave_requests(student_id)')
 
     conn.commit()
     conn.close()
@@ -93,6 +115,22 @@ def seed_test_data():
         conn.commit()
         conn.close()
         print('  [OK] 新增課程 4 門')
+
+    # 預設登入帳號：僅當 users 表為空時才填入
+    if not query('SELECT 1 FROM users LIMIT 1'):
+        conn = get_connection()
+        default_users = [
+            ('student', '123456', 'student'),
+            ('admin', '123456', 'admin'),
+        ]
+        for u in default_users:
+            conn.execute(
+                "INSERT INTO users (user_id, password, role) VALUES (?, ?, ?)",
+                u
+            )
+        conn.commit()
+        conn.close()
+        print('  [OK] 新增預設帳號: student / admin (密碼皆為 123456)')
 
 
 if __name__ == '__main__':

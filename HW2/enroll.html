@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>國立金門大學 - 線上加退選作業</title>
+<style>
+/* ============================================================
+   2005 年傳統 HTML Frame 校務系統介面
+   * 字體：新細明體 PMingLiU，基礎 12px
+   * 全域無 border-radius、無陰影、無 Flexbox/Grid 留白
+   ============================================================ */
+* {
+  margin: 0;
+  padding: 0;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+html, body {
+  height: 100%;
+}
+
+body {
+  font-family: "新細明體", PMingLiU, MingLiU, serif;
+  font-size: 12px;
+  color: #000;
+  background: #fff;
+}
+
+.app {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ---------- Header 上方深藍橫幅 ---------- */
+.header-wrap {
+  background: #3b5598;
+  flex-shrink: 0;
+}
+
+.header-table {
+  width: 100%;
+  height: 70px;
+  border-collapse: collapse;
+  table-layout: fixed;
+  border: 0;
+}
+
+.header-left,
+.header-center,
+.header-right {
+  vertical-align: middle;
+}
+
+.header-left {
+  width: 160px;
+  padding: 2px 6px;
+  text-align: left;
+}
+
+.header-center {
+  text-align: center;
+  color: #fff;
+}
+
+.header-center .logo {
+  font-size: 22px;
+  letter-spacing: 3px;
+  font-weight: bold;
+}
+
+.header-center .logo-en {
+  font-size: 12px;
+  letter-spacing: 2px;
+}
+
+.header-right {
+  width: 230px;
+  padding: 2px 6px;
+  text-align: left;
+}
+
+.user-info {
+  color: #ffff00;
+  font-weight: bold;
+}
+
+.user-line {
+  line-height: 1.3;
+  padding: 1px 0;
+}
+
+/* ---------- 傳統立體按鈕（灰底黑字） ---------- */
+.retro-btn {
+  background: #c0c0c0;
+  border: 2px outset;
+  border-color: #ffffff #808080 #808080 #ffffff;
+  padding: 2px 10px;
+  font-family: "新細明體", PMingLiU, MingLiU, serif;
+  font-size: 12px;
+  color: #000;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.retro-btn:active { border-style: inset; }
+.retro-btn:hover { background: #d0d0d0; }
+
+/* ---------- 內容區 ---------- */
+.main-scroll {
+  flex: 1;
+  overflow-y: auto;
+  background: #eaeaea;
+  padding: 4px 6px;
+}
+
+/* 置中按鈕列 */
+.btn-bar {
+  text-align: center;
+  margin: 6px 0;
+}
+
+.panel-title {
+  text-align: center;
+  font-weight: bold;
+  margin: 8px 0 4px 0;
+}
+
+/* ---------- 選課表格：傳統 Table 排版 ---------- */
+table.course-grid {
+  width: 100%;
+  border: 1px solid #999;
+  border-collapse: collapse;
+  text-align: center;
+  background: #fff;
+  font-size: 12px;
+}
+
+table.course-grid th,
+table.course-grid td {
+  border: 1px solid #999;
+  padding: 3px;
+  font-size: 12px;
+  text-align: center;
+  vertical-align: middle;
+}
+
+table.course-grid th {
+  background: #e0e0e0;
+  font-weight: normal;
+}
+
+/* 第一欄表頭「加選」：紅字 */
+table.course-grid th.enroll-head {
+  color: red;
+}
+
+/* 必修白底 / 選修淺黃綠底 由 JS 依資料上色 */
+.required-bg { background: #ffffff; }
+.elective-bg { background: #e6f2c8; }
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- ============ Header：三欄 Table ============ -->
+  <div class="header-wrap">
+    <table class="header-table">
+      <tbody>
+        <tr>
+          <td class="header-left">
+            <button class="retro-btn" onclick="location.href='index.html'">回上一頁</button>
+          </td>
+          <td class="header-center">
+            <span class="logo">國立金門大學</span><br>
+            <span class="logo-en">National Quemoy University</span>
+          </td>
+          <td class="header-right">
+            <div class="user-info">
+              <div class="user-line">116學年度第1學期</div>
+              <div class="user-line">資工二</div>
+              <div class="user-line">邱祺峰</div>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ============ 主要內容 ============ -->
+  <div class="main-scroll">
+    <!-- 上方置中按鈕列 -->
+    <div class="btn-bar">
+      <button class="retro-btn" onclick="location.href='index.html'">回上一頁</button>
+      <button class="retro-btn" onclick="submitEnroll()">確定送出</button>
+    </div>
+
+    <div class="panel-title">【 線 上 加 退 選 作 業 】</div>
+
+    <!-- 可加選課程表格 -->
+    <table class="course-grid" id="courseGrid">
+      <thead>
+        <tr>
+          <th class="enroll-head">加選</th>
+          <th>選課代號</th>
+          <th>科目</th>
+          <th>科目英文名</th>
+          <th>班級</th>
+          <th>分組</th>
+          <th>學分</th>
+          <th>小時</th>
+          <th>必選修</th>
+          <th>開課別</th>
+          <th>教師</th>
+          <th>教室</th>
+          <th>時間</th>
+          <th>合班班級</th>
+          <th>上限人數</th>
+          <th>下限人數</th>
+          <th>實收人數</th>
+          <th>限修備註</th>
+          <th>備註</th>
+        </tr>
+      </thead>
+      <tbody id="courseBody"></tbody>
+    </table>
+
+    <!-- 下方置中按鈕列 -->
+    <div class="btn-bar">
+      <button class="retro-btn" onclick="location.href='index.html'">回上一頁</button>
+      <button class="retro-btn" onclick="submitEnroll()">確定送出</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   可加選課程資料
+   ============================================================ */
+const availableCourses = [
+  { id: "0156", name: "作業系統", nameEn: "Operating System", class: "資工三", group: "01", credits: "3.0", hours: "3.0", required: "必修", term: "學期", teacher: "馮玄明", room: "I101圖資電腦教室", time: "(一)2-4", max: 65, min: 10, current: 62 },
+  { id: "0154", name: "專題製作(一)", nameEn: "Senior Projects (I)", class: "資工三", group: "01", credits: "3.0", hours: "3.0", required: "必修", term: "學期", teacher: "李錫捷,吳佳駿,柯志亨,潘進儒,王建鈞,趙于翔,陳正德,陳鍾誠,馮玄明", room: "E319數位系統應用實驗", time: "(五)5-7", max: 60, min: 10, current: 49 },
+  { id: "0160", name: "人工智慧導論", nameEn: "Introduction to Artificial Intelligence", class: "資工三", group: "01", credits: "3.0", hours: "3.0", required: "選修", term: "學期", teacher: "李錫捷", room: "E320多媒體實驗室", time: "(一)5-7", max: 60, min: 10, current: 23 },
+  { id: "0159", name: "伺服器架設", nameEn: "Server Setup & Maintenance", class: "資工三", group: "01", credits: "3.0", hours: "3.0", required: "選修", term: "學期", teacher: "柯志亨", room: "E321電腦網路實驗室", time: "(二)2-4", max: 60, min: 10, current: 31 },
+  { id: "0158", name: "微電腦數位實習", nameEn: "Micro-Computer Digital Practice", class: "資工三", group: "01", credits: "3.0", hours: "3.0", required: "選修", term: "學期", teacher: "趙于翔", room: "E322嵌入式實驗室", time: "(四)2-4", max: 60, min: 10, current: 30 },
+  { id: "0155", name: "演算法", nameEn: "Introduction to Algorithms", class: "資工三", group: "01", credits: "3.0", hours: "3.0", required: "選修", term: "學期", teacher: "陳鍾誠", room: "E320多媒體實驗室", time: "(三)2-4", max: 60, min: 10, current: 49 },
+  { id: "0157", name: "遊戲程式設計", nameEn: "Game Programming", class: "資工三", group: "01", credits: "3.0", hours: "3.0", required: "選修", term: "學期", teacher: "趙于翔", room: "E322嵌入式實驗室", time: "(二)5-7", max: 60, min: 10, current: 25 }
+];
+
+/* ---------- 以 .map() 產生資料列 ---------- */
+(function renderRows() {
+  const body = document.getElementById('courseBody');
+
+  body.innerHTML = availableCourses.map(function (c) {
+    // 選修課 => 淺黃綠底；必修課 => 白底
+    const bgClass = c.required === '選修' ? 'elective-bg' : 'required-bg';
+
+    return '<tr class="' + bgClass + '">' +
+      '<td><input type="checkbox" data-id="' + c.id + '" data-name="' + c.name + '" /></td>' +
+      '<td>' + c.id + '</td>' +
+      '<td>' + c.name + '</td>' +
+      '<td>' + c.nameEn + '</td>' +
+      '<td>' + c.class + '</td>' +
+      '<td>' + c.group + '</td>' +
+      '<td>' + c.credits + '</td>' +
+      '<td>' + c.hours + '</td>' +
+      '<td>' + c.required + '</td>' +
+      '<td>' + c.term + '</td>' +
+      '<td>' + c.teacher + '</td>' +
+      '<td>' + c.room + '</td>' +
+      '<td>' + c.time + '</td>' +
+      '<td></td>' +
+      '<td>' + c.max + '</td>' +
+      '<td>' + c.min + '</td>' +
+      '<td>' + c.current + '</td>' +
+      '<td></td>' +
+      '<td></td>' +
+      '</tr>';
+  }).join('');
+})();
+
+/* ---------- 確定送出：收集勾選的課程 ---------- */
+function submitEnroll() {
+  const checked = document.querySelectorAll('#courseGrid input[type="checkbox"]:checked');
+  if (checked.length === 0) {
+    alert('尚未勾選任何課程，請先選擇要加退選的課程。');
+    return;
+  }
+
+  let msg = '您已勾選 ' + checked.length + ' 門課程，將進行加選處理：\n\n';
+  checked.forEach(function (cb) {
+    msg += ' - [' + cb.dataset.id + '] ' + cb.dataset.name + '\n';
+  });
+  alert(msg);
+}
+</script>
+</body>
+</html>
