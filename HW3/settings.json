@@ -1,0 +1,14 @@
+{
+  "favorites": [
+    "LAL",
+    "PHI"
+  ],
+  "notify_enabled": true,
+  "notify_tipoff": true,
+  "notify_result": true,
+  "refresh_seconds": 60,
+  "preview_days": 7,
+  "autostart": true,
+  "start_minimized": false,
+  "mini_widget": false
+}
