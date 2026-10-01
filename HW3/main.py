@@ -893,11 +893,11 @@ class App(tk.Tk):
                     and other["score"] != side["score"]:
                 color = WIN if side["score"] > other["score"] else MUTED
         score_txt = str(side["score"]) if side["has_score"] else "-"
-        tk.Label(box, text=score_txt, bg=CARD, fg=color,
-                 font=(FONT, 18, "bold")).pack(side="right")
         if side["wins"]:
             tk.Label(box, text=side["wins"], bg=CARD, fg=MUTED,
-                     font=(FONT, 9)).pack(side="right", padx=(0, 10))
+                     font=(FONT, 9)).pack(side="left", padx=(10, 0))
+        tk.Label(box, text=score_txt, bg=CARD, fg=color,
+                 font=(FONT, 18, "bold")).pack(side="left", padx=(10, 0))
 
     def _render_schedule(self, rows):
         self.current_schedule = rows
