@@ -762,6 +762,8 @@ class App(tk.Tk):
                         self.team_note.config(text=f"載入失敗：{payload}")
                     elif key and key.startswith("bx:"):
                         self.bx_hint.config(text=f"載入失敗：{payload}")
+                    elif key and key.startswith("pc:"):
+                        self._render_player_card(key, {"error": payload})
                     continue
                 if not key:
                     continue
@@ -784,7 +786,7 @@ class App(tk.Tk):
                     elif key == "demo":
                         self._finish_demo(payload)
                     elif key.startswith("pc:"):
-                        self._render_player_card(key[3:], payload)
+                        self._render_player_card(key, payload)
                 except Exception as exc:
                     # 單一頁面畫錯不能讓整個 event loop 停擺，
                     # 否則 after() 鏈一斷，之後所有頁都不會再更新。
