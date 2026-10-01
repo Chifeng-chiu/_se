@@ -226,3 +226,6 @@ yarn-error.log*
 **/backend/data/*.db
 *.db
 desktop.ini
+
+# HW3 team logo cache (downloaded at runtime)
+HW3/logos/

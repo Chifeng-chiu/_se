@@ -111,6 +111,9 @@ class App(tk.Tk):
         self.current_boxscore: dict = {}
         self.current_roster: dict = {}
         self.current_plays: list = []
+        self.current_standings: list = []
+        self._logos: dict = {}
+        self._logo_asked: set = set()
         self._card_windows: dict = {}
 
         self.auto_var = tk.BooleanVar(value=True)
@@ -164,7 +167,7 @@ class App(tk.Tk):
         self.nb.pack(fill="both", expand=True, padx=14)
         self.tabs = {}
         for key, title in (("scores", "  比分明細  "), ("boxscore", "  單場數據  "),
-                           ("schedule", "  未來賽程  "), ("standings", "  東西區戰績  "),
+                           ("schedule", "  未來賽程  "), ("standings", "  球隊戰績  "),
                            ("teams", "  球隊詳情  "), ("trend", "  賽季走勢  "),
                            ("settings", "  設定  ")):
             frame = tk.Frame(self.nb, bg=BG)
@@ -342,6 +345,12 @@ class App(tk.Tk):
         bar = tk.Frame(parent, bg=BG)
         bar.pack(fill="x", padx=4, pady=(8, 6))
         self.season_var = tk.StringVar(value="本季")
+        self.stand_scope = tk.StringVar(value="全聯盟")
+        stand_conf = ttk.Combobox(bar, textvariable=self.stand_scope,
+                                  state="readonly", width=8,
+                                  values=["全聯盟", "東區", "西區"])
+        stand_conf.pack(side="left", padx=(0, 10))
+        stand_conf.bind("<<ComboboxSelected>>", lambda _e: self._draw_standings())
         self.season_box = ttk.Combobox(bar, textvariable=self.season_var, state="readonly",
                                       values=self._season_choices(), width=12)
         self.season_box.pack(side="left")
@@ -352,7 +361,8 @@ class App(tk.Tk):
 
         cols = ("seed", "team", "w", "l", "pct", "gb", "streak", "home", "road",
                 "diff", "ppg")
-        self.tree = ttk.Treeview(parent, columns=cols, show="headings")
+        self.tree = ttk.Treeview(parent, columns=cols, show="tree headings")
+        self.tree.column("#0", width=34, stretch=False)
         heads = {
             "seed": ("#", 40, "center"), "team": ("隊伍", 130, "w"),
             "w": ("勝", 45, "center"), "l": ("負", 45, "center"),
@@ -787,6 +797,8 @@ class App(tk.Tk):
                         self._finish_demo(payload)
                     elif key.startswith("pc:"):
                         self._render_player_card(key, payload)
+                    elif key.startswith("logo:"):
+                        self._render_logo(key[5:], payload)
                 except Exception as exc:
                     # 單一頁面畫錯不能讓整個 event loop 停擺，
                     # 否則 after() 鏈一斷，之後所有頁都不會再更新。
@@ -909,25 +921,42 @@ class App(tk.Tk):
         self._set_status(f"未來賽程 {count} 場　·　{datetime.now():%H:%M:%S}")
 
     def _render_standings(self, rows):
+        self.current_standings = rows
+        self._draw_standings()
+
+    @staticmethod
+    def _filter_standings(rows, scope):
+        """scope: 'all' | 'E' | 'W'. Conference split, sorted by record."""
+        if scope == "E":
+            rows = [r for r in rows if r["conference"].startswith("East")]
+        elif scope == "W":
+            rows = [r for r in rows if r["conference"].startswith("West")]
+        return sorted(rows, key=lambda r: (-r["wins"], r["losses"]))
+
+    def _stand_scope(self):
+        return {"全聯盟": "all", "東區": "E", "西區": "W"}.get(
+            self.stand_scope.get(), "all")
+
+    def _draw_standings(self):
+        rows = self._filter_standings(self.current_standings, self._stand_scope())
         for item in self.tree.get_children():
             self.tree.delete(item)
         favs = set(self.cfg["favorites"])
-        order = {"Eastern Conference": 0, "Western Conference": 1}
-        for row in sorted(rows, key=lambda r: (order.get(r["conference"], 9),
-                                              -r["wins"], r["losses"])):
+        for pos, row in enumerate(rows):
             played = row["wins"] + row["losses"]
             tags = []
             if row["abbr"] in favs:
                 tags.append("fav")
             if row["abbr"] in self.cfg.get("playoffs", []):
                 tags.append("playoff")
-            self.tree.insert("", "end", values=(
-                self._rank(rows, row) if played else "-",
+            self.tree.insert("", "end", iid=row["abbr"], values=(
+                pos + 1 if played else "-",
                 row["team"], row["wins"], row["losses"], row["pct"], row["gb"],
                 row["streak"], row["home"], row["road"], row["diff"], row["ppg"],
-            ), tags=tuple(tags))
+            ), tags=tuple(tags), image=self._logos.get(row["abbr"]) or "")
         played = sum(r["wins"] + r["losses"] for r in rows) / max(len(rows), 1)
         self.stand_note.config(text=f"東、西部　·　各隊平均已打 {played:.1f} 場")
+        self._ensure_logos([r["abbr"] for r in rows])
 
     def _render_boxscore(self, data):
         if data["event_id"] != str(self.boxscore_game):
@@ -1181,11 +1210,60 @@ class App(tk.Tk):
     def _team_index(p: dict) -> str:
         return "★" if p.get("starter") else ""
 
-    @staticmethod
-    def _rank(rows, row):
-        peers = [r for r in rows if r["conference"] == row["conference"]]
-        peers.sort(key=lambda r: (-r["wins"], r["losses"]))
-        return peers.index(row) + 1
+    # ---------- team logos ----------
+    def _logo_path(self, abbr):
+        return settings.app_dir() / "logos" / f"{abbr.lower()}.png"
+
+    def _ensure_logos(self, abbrs):
+        """Download missing logos in background, one worker for all."""
+        todo = [a for a in abbrs
+                if a and a not in self._logos and a not in self._logo_asked]
+        if not todo:
+            return
+        self._logo_asked.update(todo)
+
+        def run():
+            for abbr in todo:
+                data = None
+                path = self._logo_path(abbr)
+                if path.exists():
+                    try:
+                        data = path.read_bytes()
+                    except OSError:
+                        data = None
+                if data is None:
+                    try:
+                        req = urllib.request.Request(
+                            "https://a.espncdn.com/i/teamlogos/nba/500/"
+                            f"{abbr.lower()}.png",
+                            headers={"User-Agent": "Mozilla/5.0"})
+                        with urllib.request.urlopen(req, timeout=15) as resp:
+                            data = resp.read()
+                    except Exception:
+                        data = None
+                if data:
+                    try:
+                        path.parent.mkdir(exist_ok=True)
+                        path.write_bytes(data)
+                    except OSError:
+                        pass
+                self.worker.put((f"logo:{abbr}", ("ok", data)))
+
+        threading.Thread(target=run, daemon=True).start()
+
+    def _render_logo(self, abbr, data):
+        if not data:
+            self._logos[abbr] = None
+            return
+        try:
+            img = tk.PhotoImage(data=base64.b64encode(data).decode("ascii"))
+            f = max(1, img.width() // 25)
+            shown = img.subsample(f) if f > 1 else img
+            self._logos[abbr] = shown
+            if self.tree.exists(abbr):
+                self.tree.item(abbr, image=shown)
+        except Exception:
+            self._logos[abbr] = None
 
     def _render_team(self, payload):
         info, roster, schedule, abbr = payload

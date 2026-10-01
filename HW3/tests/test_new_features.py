@@ -113,5 +113,32 @@ class TestPlays(unittest.TestCase):
         self.assertEqual(bx["plays"][1]["period"], 4)
 
 
+class TestStandingsFilter(unittest.TestCase):
+    ROWS = [
+        {"conference": "Eastern Conference", "team": "A", "abbr": "A",
+         "wins": 50, "losses": 32},
+        {"conference": "Eastern Conference", "team": "B", "abbr": "B",
+         "wins": 60, "losses": 22},
+        {"conference": "Western Conference", "team": "C", "abbr": "C",
+         "wins": 55, "losses": 27},
+    ]
+
+    def test_all_sorted_by_record(self):
+        out = m.App._filter_standings(self.ROWS, "all")
+        self.assertEqual([r["abbr"] for r in out], ["B", "C", "A"])
+
+    def test_east_only(self):
+        out = m.App._filter_standings(self.ROWS, "E")
+        self.assertEqual([r["abbr"] for r in out], ["B", "A"])
+
+    def test_west_only(self):
+        out = m.App._filter_standings(self.ROWS, "W")
+        self.assertEqual([r["abbr"] for r in out], ["C"])
+
+    def test_unknown_scope_falls_back_to_all(self):
+        out = m.App._filter_standings(self.ROWS, "??")
+        self.assertEqual(len(out), 3)
+
+
 if __name__ == "__main__":
     unittest.main()
