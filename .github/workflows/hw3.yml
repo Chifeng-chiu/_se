@@ -1,0 +1,46 @@
+name: HW3 tests
+
+on:
+  push:
+    paths:
+      - "HW3/**"
+      - ".github/workflows/hw3.yml"
+  pull_request:
+    paths:
+      - "HW3/**"
+
+jobs:
+  test:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: HW3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run unit tests (no network needed)
+        run: python -m unittest discover -s tests -v
+
+  package:
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: HW3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install PyInstaller
+        run: pip install pyinstaller
+      - name: Build single-file exe
+        run: pyinstaller --noconfirm --onefile --windowed --name NBA-Tracker main.py
+      - name: Upload exe
+        uses: actions/upload-artifact@v4
+        with:
+          name: NBA-Tracker-windows
+          path: HW3/dist/NBA-Tracker.exe

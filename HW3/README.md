@@ -44,6 +44,7 @@ NBA 賽程、戰績與逐場數據早就是公開資料（ESPN API 免費、無�
 * **自動刷新**：預設 60 秒更新一次，間隔可調（15～600 秒）
 * **Windows 通知**：開賽提醒、開打通知、比賽結果通知（工作列閃爍提醒）
 * **迷你比分小工具**：置頂小窗只看關注隊伍，釘在工作角落，可拖曳、雙擊開主視窗
+* **高 DPI 適配**：宣告 Per-Monitor V2，4K 投影時字體正常縮放
 * **設定持久化**：`settings.json` 存設定、`state.json` 存已看過的比賽狀態
 * **示範模式**：季前／開季前無賽事時，一鍵載入上一季完賽資料試用各功能
 
@@ -88,6 +89,18 @@ python 測試_邊界.py   # 真實資料下的邊界情況與設定正規化
 
 `測試_整合.py` 會建立 Tk 視窗並模擬操作（切換分頁、篩選、開關小工具），執行時會短暫開窗，屬正常現象。
 
+
+單元測試不需要網路與視窗，push 後由 GitHub Actions 自動執行：
+
+```bash
+python -m unittest discover -s tests -v   # alerts／settings／nba_api，共 34 個測試
+```
+## 離線示範與持續整合
+
+* **離線示範**：先 `python record_demo.py` 把 ESPN 回應錄成 `demo_data/` 快照（約 20 支請求），之後 `python demo_offline.py` 不需網路也能跑完整展示流程，適合課堂發表不斷網
+* **單元測試**：`tests/` 用 `unittest` + `mock` 覆蓋通知引擎、設定正規化與資料解析，不需連網，秒級跑完
+* **CI 與打包**：`.github/workflows/hw3.yml` 在 push／PR 時自動跑測試；push 到 main 還會用 PyInstaller 打包 Windows exe 並上傳 Artifacts
+
 ## 專案結構
 
 ```
@@ -98,6 +111,10 @@ HW3/
 ├── settings.py        # settings.json / state.json 讀寫與欄位正規化
 ├── system.py          # Windows 通知（Toast）與開機自動啟動（登錄檔）
 ├── widget.py          # 置頂迷你比分小工具
+├── demo_offline.py    # 離線示範啟動器：讀快照、自動播放一場完賽
+├── record_demo.py     # 錄製 ESPN 快照到 demo_data/
+├── demo_data/         # 離線示範用 API 快照（index.json + meta.json）
+├── tests/             # unittest + mock 單元測試（不需連網）
 ├── 測試_整合.py        # 整合驗證腳本
 ├── 測試_邊界.py        # 邊界情況測試腳本
 ├── 啟動.bat            # Windows 一鍵啟動

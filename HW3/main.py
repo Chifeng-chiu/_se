@@ -1,6 +1,7 @@
 """NBA 追蹤小工具 — 主視窗（比分 / 戰績 / 賽程 / 球隊 / 設定）。"""
 
 import queue
+import sys
 import threading
 import tkinter as tk
 from datetime import date, datetime, timedelta
@@ -1201,21 +1202,50 @@ class App(tk.Tk):
         abbr = self.cfg["favorites"][0] if self.cfg["favorites"] else "GS"
         season = self.season_year() - 1  # 上一季（已完整打完）
         self._set_status(f"示範：載入 {abbr} 上一季最後一天…")
-        self._async(lambda: (api.team_schedule(abbr, season), abbr), "demo")
+        self._async(lambda: self._demo_payload(abbr, season), "demo")
+
+    @staticmethod
+    def _demo_payload(abbr, season):
+        """Demo worker: schedule -> last final -> the scoreboard date that
+        actually lists that game. ESPN scoreboard dates are US Eastern, so a
+        UTC date near midnight can belong to the previous scoreboard."""
+        schedule = api.team_schedule(abbr, season)
+        finals = [g for g in schedule if g.get("final")]
+        if not finals:
+            return (schedule, abbr, None)
+        last = finals[-1]
+        try:
+            utc_day = _to_local(last.get("date")).date()
+        except Exception:
+            return (schedule, abbr, None)
+        board_day = None
+        for cand in (utc_day, utc_day - timedelta(days=1)):
+            try:
+                games = api.scoreboard(cand)
+            except api.NBAError:
+                continue
+            if any(g["id"] == last["id"] for g in games):
+                board_day = cand
+                break
+        return (schedule, abbr, board_day)
 
     def _finish_demo(self, payload):
-        schedule, abbr = payload
+        schedule, abbr = payload[0], payload[1]
+        board_day = payload[2] if len(payload) > 2 else None
         finals = [g for g in schedule if g.get("final")]
         if not finals:
             self._set_status("找不到已完賽的示範場次")
             return
         last_day = finals[-1]
-        try:
-            d = _to_local(last_day["date"])
-        except Exception:
-            d = None
-        if d is not None:
-            self.day = d.date()
+        if board_day is not None:
+            self.day = board_day
+        else:
+            try:
+                d = _to_local(last_day["date"])
+            except Exception:
+                d = None
+            if d is not None:
+                self.day = d.date()
         self._load_scores()
         # 順便打開當天第一場的單場數據，示範 boxscore。
         games = [g for g in finals if g.get("date", "")[:10] ==
@@ -1316,7 +1346,27 @@ def _tipoff_text(dt_str):
     return f"{int(hours // 24)} 天後"
 
 
+def _enable_dpi_awareness():
+    """Tell Windows the app handles DPI scaling itself.
+
+    Without this, Tk looks blurry or tiny on high-DPI (e.g. 4K projector)
+    screens because Windows bitmap-scales the whole window. Best effort:
+    failure keeps the old behavior.
+    """
+    if sys.platform != "win32":
+        return
+    try:
+        import ctypes
+        try:
+            ctypes.windll.shcore.SetProcessDpiAwareness(2)  # per-monitor v2
+        except Exception:
+            ctypes.windll.user32.SetProcessDPIAware()  # older fallback
+    except Exception:
+        pass
+
+
 def main():
+    _enable_dpi_awareness()
     cfg = settings.load()
     app = App()
     app._fill_favorites()

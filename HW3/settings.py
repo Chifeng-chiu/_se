@@ -69,7 +69,8 @@ def _normalize(cfg: dict) -> dict:
         favs = []
     cleaned = {str(x).strip().upper() for x in favs if str(x).strip()}
     # 關聯縮寫，讓常見的 "GSW" 自動對應到 ESPN 實際使用的 "GS"。
-    out["favorites"] = sorted(ABBR_ALIASES.get(f, f) for f in cleaned)[:30]
+    # 正規化後再去重一次，否則 "GSW" + "GS" 會留下兩個 "GS"。
+    out["favorites"] = sorted({ABBR_ALIASES.get(f, f) for f in cleaned})[:30]
     # 用預設值時要判 None 而不是 falsy，否則 0 會被當成「沒設定」而跳成 60。
     out["refresh_seconds"] = _clamp(out.get("refresh_seconds"), 60, 15, 600)
     out["preview_days"] = _clamp(out.get("preview_days"), 7, 1, 14)

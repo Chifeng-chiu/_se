@@ -1,0 +1,22 @@
+{
+  "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams": "adbc6fae3f32fe3d.json",
+  "https://site.api.espn.com/apis/v2/sports/basketball/nba/standings": "b5f08e6e8778d28c.json",
+  "https://site.api.espn.com/apis/v2/sports/basketball/nba/standings?season=2026": "302b2632d0fe2b6f.json",
+  "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams/lal/roster": "3d117073e578a981.json",
+  "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams/lal/schedule": "01bca678933b1fce.json",
+  "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams/lal/schedule?season=2026": "c5399a5edaf275b6.json",
+  "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams/gs/roster": "5c12d4fb61c3a1c8.json",
+  "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams/gs/schedule": "b57cfe7195e327f9.json",
+  "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams/gs/schedule?season=2026": "c8bb284fd0017219.json",
+  "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=20260413": "10a6dc3c4150c1e2.json",
+  "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=20260412": "b592b58d3c5497df.json",
+  "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event=401811041": "934f90974c1fb63e.json",
+  "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=20261001": "5f1e6bb670418ba5.json",
+  "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=20261002": "8208c0358ad9b3f8.json",
+  "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=20261003": "0ea8304eadf7d047.json",
+  "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=20261004": "c07744778c3876a6.json",
+  "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=20261005": "92020e542de31cd7.json",
+  "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=20261006": "714c189bd8472c99.json",
+  "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=20261007": "ee0674db11ba69d1.json",
+  "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=20261008": "93177042cdb395ad.json"
+}
