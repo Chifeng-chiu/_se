@@ -35,12 +35,15 @@ META = json.loads((DATA / "meta.json").read_text(encoding="utf-8"))
 import nba_api as api  # noqa: E402  (patched before main imports it)
 
 
-def _offline_get(url: str, params: dict | None = None):
+def _offline_get(url: str, params: dict | None = None, **_kw):
     if params:
         url = f"{url}?{urllib.parse.urlencode(params)}"
-    if url not in STORE:
-        raise api.NBAError("offline demo: no snapshot for this request")
-    return copy.deepcopy(STORE[url])
+    if url in STORE:
+        return copy.deepcopy(STORE[url])
+    # Core API (player cards) has no snapshots; report offline honestly.
+    if "sports.core.api.espn.com" in url:
+        raise api.NBAError("offline demo: player data needs network")
+    raise api.NBAError("offline demo: no snapshot for this request")
 
 
 api._get = _offline_get

@@ -1,8 +1,10 @@
 """NBA 追蹤小工具 — 主視窗（比分 / 戰績 / 賽程 / 球隊 / 設定）。"""
 
+import base64
 import queue
 import sys
 import threading
+import urllib.request
 import tkinter as tk
 from datetime import date, datetime, timedelta
 from tkinter import ttk
@@ -21,6 +23,70 @@ WIN = "#4ade80"
 LOSS = "#f87171"
 FONT = "Segoe UI"
 TIPOFF_WINDOW = alerts.TIPOFF_WINDOW_MIN
+
+
+def _sort_num(text, diff=False):
+    """Best-effort number for sorting: '32' -> 32, '12-20' -> 12,
+    '12:34' -> 12.57 minutes, '+5' -> 5, missing -> -inf (sinks)."""
+    s = str(text).strip()
+    if not s or s in ("-", "--", "—", "–"):
+        return float("-inf")
+    if diff and s.count("-") == 1 and not s.startswith("-"):
+        a, b = s.split("-")
+        try:
+            return int(a) - int(b)
+        except ValueError:
+            pass
+    if ":" in s:
+        try:
+            mm, ss = s.split(":")
+            return int(mm) + int(ss) / 60
+        except ValueError:
+            pass
+    first = s.split("-")[0].split("/")[0].strip().lstrip("+")
+    try:
+        return float(first)
+    except ValueError:
+        return float("-inf")
+
+
+def _make_tree_sortable(tree, numeric=(), diff=()):
+    """Click a heading to sort that column; click again to reverse.
+
+    Numeric columns start descending (biggest first), text ascending.
+    Rows tagged 'total' (team totals) always stay pinned on top.
+    """
+    numeric = set(numeric)
+    diff = set(diff)
+    state = {"col": None, "rev": False}
+
+    def key_of(item, col):
+        vals = tree.item(item, "values")
+        idx = tree["columns"].index(col)
+        text = vals[idx] if idx < len(vals) else ""
+        if col in numeric or col in diff:
+            return (0, _sort_num(text, diff=(col in diff)))
+        return (1, str(text).lower())
+
+    def sort_by(col):
+        if state["col"] == col:
+            state["rev"] = not state["rev"]
+        else:
+            state.update(col=col, rev=(col in numeric or col in diff))
+        pinned = [it for it in tree.get_children("")
+                  if "total" in tree.item(it, "tags")]
+        rest = [it for it in tree.get_children("")
+                if "total" not in tree.item(it, "tags")]
+        rest.sort(key=lambda it: key_of(it, col), reverse=state["rev"])
+        for pos, item in enumerate(pinned + rest):
+            tree.move(item, "", pos)
+        for c in tree["columns"]:
+            tree.heading(c, text=tree.heading(c, "text").rstrip(" ▲▼"))
+        mark = " ▼" if state["rev"] else " ▲"
+        tree.heading(col, text=tree.heading(col, "text") + mark)
+
+    for col in tree["columns"]:
+        tree.heading(col, command=lambda c=col: sort_by(c))
 
 
 class App(tk.Tk):
@@ -42,6 +108,10 @@ class App(tk.Tk):
         self.widget = None
         self.current_games: list[dict] = []
         self.current_schedule: list[tuple] = []
+        self.current_boxscore: dict = {}
+        self.current_roster: dict = {}
+        self.current_plays: list = []
+        self._card_windows: dict = {}
 
         self.auto_var = tk.BooleanVar(value=True)
         self.status_var = tk.StringVar(value="載入中…")
@@ -192,12 +262,38 @@ class App(tk.Tk):
             tree.tag_configure("bench", foreground=MUTED)
             tree.tag_configure("total", foreground=ACCENT)
             tree.tag_configure("ejected", foreground=LOSS)
+            _make_tree_sortable(tree, numeric=set(api.BOX_COLUMNS))
             vsb = ttk.Scrollbar(col, orient="vertical", command=tree.yview)
             tree.configure(yscrollcommand=vsb.set)
             vsb.pack(side="right", fill="y")
             tree.pack(fill="both", expand=True)
             setattr(self, f"bx_title_{side}", title)
+            tree.bind("<Double-Button-1>", self._on_boxscore_open)
             self.bx_trees.append(tree)
+
+        pb = tk.Frame(parent, bg=BG)
+        pb.pack(fill="x", padx=4, pady=(6, 4))
+        tk.Label(pb, text="比賽事件", bg=BG, fg=MUTED,
+                 font=(FONT, 9, "bold")).pack(side="left")
+        self.plays_scoring_only = tk.BooleanVar(value=False)
+        ttk.Checkbutton(pb, text="只看得分", variable=self.plays_scoring_only,
+                        command=self._render_plays).pack(side="left", padx=10)
+        self.plays_tree = ttk.Treeview(parent,
+                                       columns=("q", "clock", "event", "score"),
+                                       show="headings", height=7)
+        for key, label, width, anchor in (("q", "節", 60, "center"),
+                                         ("clock", "時間", 70, "center"),
+                                         ("event", "事件", 400, "w"),
+                                         ("score", "比分", 90, "center")):
+            self.plays_tree.heading(key, text=label)
+            self.plays_tree.column(key, width=width, anchor=anchor,
+                                   stretch=(key == "event"))
+        self.plays_tree.tag_configure("score", foreground=ACCENT)
+        psb = ttk.Scrollbar(parent, orient="vertical",
+                            command=self.plays_tree.yview)
+        self.plays_tree.configure(yscrollcommand=psb.set)
+        psb.pack(side="right", fill="y", padx=(0, 4))
+        self.plays_tree.pack(fill="x", padx=4, pady=(0, 6))
 
     def _open_boxscore(self, game):
         self.boxscore_game = game["id"]
@@ -238,6 +334,7 @@ class App(tk.Tk):
         sb.pack(side="right", fill="y", padx=(0, 4))
         self.sched_tree.pack(fill="both", expand=True, padx=4, pady=(0, 6))
         self.sched_tree.tag_configure("fav", background="#243049")
+        _make_tree_sortable(self.sched_tree)
 
     # ---------- 戰績 ----------
     def _build_standings(self):
@@ -273,6 +370,8 @@ class App(tk.Tk):
         self.tree.pack(fill="both", expand=True, padx=4)
         self.tree.tag_configure("fav", background="#243049")
         self.tree.tag_configure("playoff", foreground=WIN)
+        _make_tree_sortable(self.tree, numeric={"seed", "w", "l", "pct", "gb",
+                                                "home", "road", "diff", "ppg"})
 
     # ---------- 球隊詳情（功能 3） ----------
     def _build_teams(self):
@@ -312,6 +411,9 @@ class App(tk.Tk):
         self.roster_tree.configure(yscrollcommand=rb.set)
         rb.pack(side="right", fill="y")
         self.roster_tree.pack(fill="both", expand=True, pady=(2, 8))
+        self.roster_tree.tag_configure("injured", foreground=LOSS)
+        self.roster_tree.bind("<Double-Button-1>", self._on_roster_open)
+        _make_tree_sortable(self.roster_tree, numeric={"no", "age"})
 
         right = tk.Frame(panes, bg=BG)
         right.pack(side="left", fill="both", expand=True, padx=(10, 0))
@@ -327,6 +429,7 @@ class App(tk.Tk):
         self.recent_tree.pack(fill="both", expand=True, pady=(2, 8))
         self.recent_tree.tag_configure("win", foreground=WIN)
         self.recent_tree.tag_configure("loss", foreground=LOSS)
+        _make_tree_sortable(self.recent_tree, diff=("score",))
 
     # ---------- 賽季走勢（功能 8：Canvas 自繪圖表） ----------
     def _build_trend(self):
@@ -680,6 +783,8 @@ class App(tk.Tk):
                         self._render_trend_playoff(payload)
                     elif key == "demo":
                         self._finish_demo(payload)
+                    elif key.startswith("pc:"):
+                        self._render_player_card(key[3:], payload)
                 except Exception as exc:
                     # 單一頁面畫錯不能讓整個 event loop 停擺，
                     # 否則 after() 鏈一斷，之後所有頁都不會再更新。
@@ -825,6 +930,9 @@ class App(tk.Tk):
     def _render_boxscore(self, data):
         if data["event_id"] != str(self.boxscore_game):
             return
+        self.current_boxscore = data
+        self.current_plays = data.get("plays", []) if data.get("available") else []
+        self._render_plays()
         game_meta = getattr(self, "boxscore_game_meta", {})
         if not data["available"]:
             self.bx_hint.config(text="此場尚未開賽或數據未出（ESPN 尚未提供）")
@@ -863,7 +971,173 @@ class App(tk.Tk):
                 tag = "ejected" if p.get("ejected") else ("starter" if p.get("starter") else "bench")
                 name = p["name"] + (" ⚠" if p.get("ejected") else "")
                 values = (self._team_index(p), name) + tuple(p.get(k, "-") for k in api.BOX_COLUMNS)
-                tree.insert("", "end", values=values, tags=(tag,))
+                kw = {"iid": str(p.get("id"))} if p.get("id") else {}
+                tree.insert("", "end", values=values, tags=(tag,), **kw)
+
+    def _render_plays(self):
+        tree = self.plays_tree
+        for item in tree.get_children():
+            tree.delete(item)
+        only = self.plays_scoring_only.get()
+        for p in reversed(self.current_plays):
+            if only and not p["scoring"]:
+                continue
+            q = p["period"]
+            qtxt = (f"Q{q}" if isinstance(q, int) and 1 <= q <= 4
+                    else (f"OT{q - 4}" if isinstance(q, int) and q > 4 else str(q)))
+            tree.insert("", "end", values=(
+                qtxt, p["clock"], p["text"], f"{p['away']}-{p['home']}"),
+                tags=("score",) if p["scoring"] else ())
+        tree.tag_configure("score", foreground=ACCENT)
+
+    # ---------- player card ----------
+    _CARD_LABELS = {"GP": "出賽", "MIN": "上場時間", "PTS": "得分",
+                    "REB": "籃板", "AST": "助攻", "STL": "抄截",
+                    "BLK": "阻攻", "TO": "失誤", "FGP": "FG%",
+                    "TPP": "3P%", "FTP": "FT%"}
+
+    def _on_roster_open(self, _event=None):
+        sel = self.roster_tree.selection()
+        if not sel or not sel[0].isdigit():
+            return
+        pid = sel[0]
+        players = (self.current_roster or {}).get("players", [])
+        bio = next((p for p in players if str(p.get("id")) == pid), None)
+        if bio is None:
+            return
+        info = getattr(self, "_team_info", None) or {}
+        self._open_player_card(pid, dict(bio), self._team_season,
+                               info.get("full_name", ""))
+
+    def _on_boxscore_open(self, event=None):
+        tree = event.widget if event is not None else None
+        if tree is None:
+            return
+        sel = tree.selection()
+        if not sel or not sel[0].isdigit():
+            return
+        pid = sel[0]
+        data = self.current_boxscore or {}
+        abbrs = [t.get("abbr") for t in data.get("teams", [])]
+        meta = getattr(self, "boxscore_game_meta", {}) or {}
+        season = _last_game_year([meta]) or None
+        self._open_player_card(pid, None, season, abbrs)
+
+    def _open_player_card(self, pid, bio, season, teams):
+        """teams: display string (roster path) or abbr list (boxscore path)."""
+        win = tk.Toplevel(self)
+        win.title("球員卡")
+        win.configure(bg=BG)
+        win.geometry("430x560")
+        win.resizable(False, False)
+        win.transient(self)
+        loading = tk.Label(win, text="載入中…", bg=BG, fg=MUTED, font=(FONT, 11))
+        loading.pack(expand=True)
+        win.bind("<Escape>", lambda _e: win.destroy())
+        key = f"pc:{pid}:{id(win)}"
+        self._card_windows[key] = (win, loading)
+        self._async(lambda: self._player_payload(pid, bio, season, teams), key)
+
+    @staticmethod
+    def _player_payload(pid, bio, season, teams):
+        """Worker: resolve bio (roster lookup when missing), fetch season
+        averages and headshot bytes. Never raises: errors come back as
+        {"error": msg} so the card window can show them."""
+        try:
+            if bio is None:
+                abbrs = teams if isinstance(teams, list) else [teams]
+                for abbr in abbrs:
+                    if not abbr:
+                        continue
+                    try:
+                        roster = api.roster(abbr)
+                    except api.NBAError:
+                        continue
+                    hit = next((p for p in roster.get("players", [])
+                                if str(p.get("id")) == pid), None)
+                    if hit is not None:
+                        bio = hit
+                        break
+            if bio is None:
+                return {"error": "找不到球員資料"}
+            stats = api.player_season_stats(pid, season)
+            photo = None
+            if bio.get("headshot"):
+                try:
+                    req = urllib.request.Request(bio["headshot"])
+                    with urllib.request.urlopen(req, timeout=15) as resp:
+                        photo = resp.read()
+                except Exception:
+                    photo = None
+            team = teams if isinstance(teams, str) else ""
+            return {"bio": bio, "stats": stats, "photo": photo,
+                    "team": team, "injured": bool(bio.get("injured"))}
+        except api.NBAError as exc:
+            return {"error": f"讀取失敗：{exc}"}
+
+    def _render_player_card(self, key, payload):
+        entry = self._card_windows.pop(key, None)
+        if entry is None:
+            return
+        win, loading = entry
+        if not win.winfo_exists():
+            return
+        loading.destroy()
+        if payload.get("error"):
+            tk.Label(win, text=payload["error"], bg=BG, fg=LOSS,
+                     font=(FONT, 11)).pack(expand=True)
+            return
+        bio, stats = payload["bio"], payload["stats"]
+        name = bio.get("name") or "球員"
+        win.title(f"{name} 球員卡")
+        top = tk.Frame(win, bg=BG)
+        top.pack(fill="x", padx=14, pady=(12, 8))
+        photo = payload.get("photo")
+        if photo:
+            try:
+                img = tk.PhotoImage(data=base64.b64encode(photo).decode("ascii"))
+                f = max(1, img.width() // 110)
+                shown = img.subsample(f) if f > 1 else img
+                tk.Label(top, image=shown, bg=BG).pack(side="left", padx=(0, 12))
+                win._photo = shown
+            except Exception:
+                pass
+        info = tk.Frame(top, bg=BG)
+        info.pack(side="left", fill="both", expand=True)
+        tk.Label(info, text=name, bg=BG, fg=FG,
+                 font=(FONT, 14, "bold"), anchor="w").pack(fill="x")
+        if payload.get("team"):
+            tk.Label(info, text=payload["team"], bg=BG, fg=MUTED,
+                     font=(FONT, 10), anchor="w").pack(fill="x")
+        line2 = "　·　".join(x for x in [
+            bio.get("position") or "",
+            ("#" + str(bio.get("jersey"))) if bio.get("jersey") else "",
+            bio.get("height") or "", bio.get("weight") or "",
+            str(bio.get("age") or ""), bio.get("college") or ""] if x)
+        if line2:
+            tk.Label(info, text=line2, bg=BG, fg=MUTED,
+                     font=(FONT, 9), anchor="w").pack(fill="x")
+        if payload.get("injured"):
+            tk.Label(info, text="傷兵名單", bg=BG, fg=LOSS,
+                     font=(FONT, 9, "bold"), anchor="w").pack(fill="x")
+        s = stats.get("season")
+        sub = f"{_season_label(s)}賽季場均"
+        vals = dict(stats.get("rows", []))
+        body = tk.Frame(win, bg=BG)
+        body.pack(fill="x", padx=14, pady=(2, 10))
+        tk.Label(body, text=sub if vals else sub + "　·　資料不足", bg=BG,
+                 fg=ACCENT, font=(FONT, 10, "bold"), anchor="w").pack(
+                     fill="x", pady=(0, 6))
+        for k in ("GP", "MIN", "PTS", "REB", "AST", "STL", "BLK",
+                  "TO", "FGP", "TPP", "FTP"):
+            if k not in vals:
+                continue
+            row = tk.Frame(body, bg=BG)
+            row.pack(fill="x", pady=1)
+            tk.Label(row, text=self._CARD_LABELS[k], bg=BG, fg=MUTED,
+                     font=(FONT, 10)).pack(side="left")
+            tk.Label(row, text=vals[k], bg=BG, fg=FG,
+                     font=(FONT, 11, "bold")).pack(side="right")
 
     @staticmethod
     def _totals_values(totals: dict) -> tuple:
@@ -931,15 +1205,20 @@ class App(tk.Tk):
                      f"{_season_label(actual)} 成績）")
         else:
             self.team_note.config(text="")
+        self.current_roster = roster
+        self._team_season = (self.season if self.season is not None
+                             else (actual or None))
+        self._team_info = info
 
         for item in self.roster_tree.get_children():
             self.roster_tree.delete(item)
         for p in roster["players"]:
-            tag = "loss" if p["injured"] else ""
+            tag = "injured" if p["injured"] else ""
             label = f"{p['name']}{' (傷)' if p['injured'] else ''}"
+            kw = {"iid": str(p.get("id"))} if p.get("id") else {}
             self.roster_tree.insert("", "end", values=(
                 p["jersey"], label, p["position"], p["height"],
-                p["weight"], p["age"]), tags=(tag,) if tag else ())
+                p["weight"], p["age"]), tags=(tag,) if tag else (), **kw)
 
         for item in self.recent_tree.get_children():
             self.recent_tree.delete(item)

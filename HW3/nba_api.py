@@ -12,6 +12,7 @@ from datetime import date, timedelta
 BASE = "https://site.api.espn.com/apis"
 NBA = f"{BASE}/site/v2/sports/basketball/nba"
 API_VERSION2 = f"{BASE}/v2/sports/basketball/nba"
+CORE = "https://sports.core.api.espn.com/v2/sports/basketball/leagues/nba"
 
 # ESPN 的 WAF 會擋掉自訂 User-Agent，沿用 urllib 預設最穩。
 USER_AGENT = None
@@ -23,11 +24,11 @@ class NBAError(Exception):
     pass
 
 
-def _get(url: str, params: dict | None = None):
+def _get(url: str, params: dict | None = None, user_agent: str | None = USER_AGENT):
     if params:
         url = f"{url}?{urllib.parse.urlencode(params)}"
-    req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT}
-                                 if USER_AGENT else {})
+    req = urllib.request.Request(url, headers={"User-Agent": user_agent}
+                                 if user_agent else {})
     try:
         with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
             return json.loads(resp.read().decode("utf-8"))
@@ -459,6 +460,7 @@ def boxscore(event_id: str) -> dict:
                     continue
                 row = dict(zip(labels, stats))
                 row["name"] = athlete.get("athlete", {}).get("displayName", "")
+                row["id"] = str(athlete.get("athlete", {}).get("id") or "")
                 row["starter"] = bool(athlete.get("starter"))
                 row["ejected"] = bool(athlete.get("ejected"))
                 row["minutes"] = _to_minutes(row.get("MIN", "0"))
@@ -484,7 +486,79 @@ def boxscore(event_id: str) -> dict:
         "venue": comps[0].get("venue", {}).get("fullName", ""),
         "attendance": comps[0].get("attendance"),
         "leaders": _parse_leaders(data.get("leaders", [])),
+        "plays": _parse_plays(data.get("plays", [])),
     }
+
+
+def _parse_plays(plays: list) -> list[dict]:
+    """Text play-by-play from the summary endpoint (newest last)."""
+    out = []
+    for p in plays or []:
+        period = p.get("period") or {}
+        clock = p.get("clock") or {}
+        out.append({
+            "period": period.get("number", 0),
+            "clock": clock.get("displayValue", ""),
+            "text": p.get("text") or p.get("shortDescription", ""),
+            "scoring": bool(p.get("scoringPlay")),
+            "away": p.get("awayScore", ""),
+            "home": p.get("homeScore", ""),
+        })
+    return out
+
+
+def _core_get(url: str):
+    """GET for the core API, which requires a browser User-Agent."""
+    return _get(url, user_agent="Mozilla/5.0")
+
+
+def player_season_stats(athlete_id, season: int | None = None) -> dict:
+    """Per-game averages for one player (regular season).
+
+    Returns {"season": year, "rows": [(key, value)]} where key is one of
+    GP/MIN/PTS/REB/AST/STL/BLK/TO/FGP/TPP/FTP. Values are display strings;
+    an empty rows list means no record that season.
+    """
+    if season is None:
+        today = date.today()
+        season = today.year + 1 if today.month >= 7 else today.year
+    try:
+        data = _core_get(
+            f"{CORE}/seasons/{season}/types/2/athletes/{athlete_id}/statistics")
+    except NBAError:
+        return {"season": season, "gp": "", "rows": []}
+    flat = {}
+    for cat in (data.get("splits") or {}).get("categories", []):
+        for s in cat.get("stats", []) or []:
+            if s.get("name"):
+                flat[s["name"]] = s.get("displayValue", "")
+
+    def num(name):
+        try:
+            return float(flat.get(name, ""))
+        except (TypeError, ValueError):
+            return None
+
+    def pct(made, att):
+        m, a = num(made), num(att)
+        if m is None or a is None or not a:
+            return ""
+        return f"{m / a * 100:.1f}%"
+
+    pairs = [("GP", str(flat.get("gamesPlayed") or flat.get("appearances") or "")),
+             ("MIN", flat.get("avgMinutes", "")),
+             ("PTS", flat.get("avgPoints", "")),
+             ("REB", flat.get("avgRebounds", "")),
+             ("AST", flat.get("avgAssists", "")),
+             ("STL", flat.get("avgSteals", "")),
+             ("BLK", flat.get("avgBlocks", "")),
+             ("TO", flat.get("avgTurnovers", "")),
+             ("FGP", pct("avgFieldGoalsMade", "avgFieldGoalsAttempted")),
+             ("TPP", pct("avgThreePointFieldGoalsMade",
+                         "avgThreePointFieldGoalsAttempted")),
+             ("FTP", pct("avgFreeThrowsMade", "avgFreeThrowsAttempted"))]
+    return {"season": season,
+            "rows": [(k, v) for k, v in pairs if v not in ("", None)]}
 
 
 def _to_int(value) -> int:
