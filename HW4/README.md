@@ -2,9 +2,9 @@
 
 ## 連結
 
-- 母專案：https://github.com/feng-organization/my-test
-- 分支：https://github.com/feng-organization/my-test/tree/developGitBranch
-- 子專案（fork）：https://github.com/Chifeng-chiu/my-test
+- 母專案：https://github.com/feng-organization/my-test/commits/main/
+- 分支：https://github.com/feng-organization/my-test/commits/developGitBranch
+- 子專案（fork）：https://github.com/Chifeng-chiu/my-test/commits/main/
 
 ## 1. 分支（Branch）
 
@@ -27,7 +27,7 @@ git push -u origin developGitBranch
 - `gh api repos/feng-organization/my-test/branches` 回傳 `main`、`developGitBranch`
 - `developGitBranch` 上的 commit：`343fc98 add gitBranch.md`
 - 母專案起點：`c43d9b3 Initial commit`
-- 網頁：https://github.com/feng-organization/my-test/tree/developGitBranch 看得到 `gitBranch.md`
+- 網頁：https://github.com/feng-organization/my-test/commits/developGitBranch 看得到 `gitBranch.md`
 
 ## 2. 合併（Merge）
 
