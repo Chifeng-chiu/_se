@@ -114,6 +114,8 @@ class App(tk.Tk):
         self.current_standings: list = []
         self._logos: dict = {}
         self._logo_asked: set = set()
+        self._card_stats: dict = {}
+        self._card_photos: dict = {}
         self._card_windows: dict = {}
 
         self.auto_var = tk.BooleanVar(value=True)
@@ -1056,27 +1058,43 @@ class App(tk.Tk):
 
     def _open_player_card(self, pid, bio, season, teams):
         """teams: display string (roster path) or abbr list (boxscore path)."""
+        if season is None:
+            season = self.season_year()
         win = tk.Toplevel(self)
         win.title("球員卡")
         win.configure(bg=BG)
-        win.geometry("430x560")
+        win.geometry("430x600")
         win.resizable(False, False)
         win.transient(self)
         loading = tk.Label(win, text="載入中…", bg=BG, fg=MUTED, font=(FONT, 11))
         loading.pack(expand=True)
         win.bind("<Escape>", lambda _e: win.destroy())
         key = f"pc:{pid}:{id(win)}"
-        self._card_windows[key] = (win, loading)
-        self._async(lambda: self._player_payload(pid, bio, season, teams), key)
+        self._card_windows[key] = {"win": win, "pid": pid, "bio": bio,
+                                   "teams": teams, "season": season,
+                                   "built": False, "body": None, "sub": None,
+                                   "combo_var": None}
+        win.bind("<Destroy>", lambda e, k=key: self._card_windows.pop(k, None)
+                 if str(e.widget) == str(win) else None)
+        self._async(lambda: self._player_payload(key), key)
 
-    @staticmethod
-    def _player_payload(pid, bio, season, teams):
-        """Worker: resolve bio (roster lookup when missing), fetch season
-        averages and headshot bytes. Never raises: errors come back as
+    def _card_season_label(self, season):
+        if season == self.season_year():
+            return "本季"
+        return _season_label(season)
+
+    def _player_payload(self, key):
+        """Worker: resolve bio once, then season stats (memory cached) and
+        photo (memory + disk cached). Never raises: errors come back as
         {"error": msg} so the card window can show them."""
+        st = self._card_windows.get(key)
+        if st is None:
+            return {"gone": True}
+        pid, season = st["pid"], st["season"]
         try:
+            bio = st.get("bio")
             if bio is None:
-                abbrs = teams if isinstance(teams, list) else [teams]
+                abbrs = st["teams"] if isinstance(st["teams"], list) else [st["teams"]]
                 for abbr in abbrs:
                     if not abbr:
                         continue
@@ -1091,84 +1109,147 @@ class App(tk.Tk):
                         break
             if bio is None:
                 return {"error": "找不到球員資料"}
-            stats = api.player_season_stats(pid, season)
-            photo = None
-            if bio.get("headshot"):
-                try:
-                    req = urllib.request.Request(bio["headshot"])
-                    with urllib.request.urlopen(req, timeout=15) as resp:
-                        photo = resp.read()
-                except Exception:
-                    photo = None
-            team = teams if isinstance(teams, str) else ""
-            return {"bio": bio, "stats": stats, "photo": photo,
-                    "team": team, "injured": bool(bio.get("injured"))}
+            st["bio"] = bio
+            ck = (pid, season)
+            stats = self._card_stats.get(ck)
+            if stats is None:
+                stats = api.player_season_stats(pid, season)
+                self._card_stats[ck] = stats
+            photo = self._card_photos.get(pid)
+            if photo is None:
+                path = settings.app_dir() / "photos" / f"{pid}.png"
+                if path.exists():
+                    try:
+                        photo = path.read_bytes()
+                    except OSError:
+                        photo = None
+                if photo is None and bio.get("headshot"):
+                    try:
+                        req = urllib.request.Request(bio["headshot"])
+                        with urllib.request.urlopen(req, timeout=15) as resp:
+                            photo = resp.read()
+                    except Exception:
+                        photo = None
+                if photo:
+                    self._card_photos[pid] = photo
+                    try:
+                        path.parent.mkdir(exist_ok=True)
+                        path.write_bytes(photo)
+                    except OSError:
+                        pass
+            team = st["teams"] if isinstance(st["teams"], str) else ""
+            return {"stats": stats, "photo": photo, "team": team,
+                    "injured": bool(bio.get("injured"))}
         except api.NBAError as exc:
             return {"error": f"讀取失敗：{exc}"}
 
     def _render_player_card(self, key, payload):
-        entry = self._card_windows.pop(key, None)
-        if entry is None:
+        st = self._card_windows.get(key)
+        if st is None:
             return
-        win, loading = entry
+        win = st["win"]
         if not win.winfo_exists():
+            self._card_windows.pop(key, None)
             return
-        loading.destroy()
+        if payload.get("gone"):
+            return
         if payload.get("error"):
+            for child in win.winfo_children():
+                child.destroy()
             tk.Label(win, text=payload["error"], bg=BG, fg=LOSS,
                      font=(FONT, 11)).pack(expand=True)
+            st["built"] = False
+            st["body"] = None
             return
-        bio, stats = payload["bio"], payload["stats"]
+        bio = st["bio"]
         name = bio.get("name") or "球員"
-        win.title(f"{name} 球員卡")
-        top = tk.Frame(win, bg=BG)
-        top.pack(fill="x", padx=14, pady=(12, 8))
-        photo = payload.get("photo")
-        if photo:
-            try:
-                img = tk.PhotoImage(data=base64.b64encode(photo).decode("ascii"))
-                f = max(1, img.width() // 110)
-                shown = img.subsample(f) if f > 1 else img
-                tk.Label(top, image=shown, bg=BG).pack(side="left", padx=(0, 12))
-                win._photo = shown
-            except Exception:
-                pass
-        info = tk.Frame(top, bg=BG)
-        info.pack(side="left", fill="both", expand=True)
-        tk.Label(info, text=name, bg=BG, fg=FG,
-                 font=(FONT, 14, "bold"), anchor="w").pack(fill="x")
-        if payload.get("team"):
-            tk.Label(info, text=payload["team"], bg=BG, fg=MUTED,
-                     font=(FONT, 10), anchor="w").pack(fill="x")
-        line2 = "　·　".join(x for x in [
-            bio.get("position") or "",
-            ("#" + str(bio.get("jersey"))) if bio.get("jersey") else "",
-            bio.get("height") or "", bio.get("weight") or "",
-            str(bio.get("age") or ""), bio.get("college") or ""] if x)
-        if line2:
-            tk.Label(info, text=line2, bg=BG, fg=MUTED,
-                     font=(FONT, 9), anchor="w").pack(fill="x")
-        if payload.get("injured"):
-            tk.Label(info, text="傷兵名單", bg=BG, fg=LOSS,
-                     font=(FONT, 9, "bold"), anchor="w").pack(fill="x")
+        if not st["built"]:
+            for child in win.winfo_children():
+                child.destroy()
+            win.title(f"{name} 球員卡")
+            top = tk.Frame(win, bg=BG)
+            top.pack(fill="x", padx=14, pady=(12, 8))
+            photo = payload.get("photo")
+            if photo:
+                try:
+                    img = tk.PhotoImage(data=base64.b64encode(photo).decode("ascii"))
+                    f = max(1, img.width() // 110)
+                    shown = img.subsample(f) if f > 1 else img
+                    tk.Label(top, image=shown, bg=BG).pack(side="left", padx=(0, 12))
+                    win._photo = shown
+                except Exception:
+                    pass
+            info = tk.Frame(top, bg=BG)
+            info.pack(side="left", fill="both", expand=True)
+            tk.Label(info, text=name, bg=BG, fg=FG,
+                     font=(FONT, 14, "bold"), anchor="w").pack(fill="x")
+            if payload.get("team"):
+                tk.Label(info, text=payload["team"], bg=BG, fg=MUTED,
+                         font=(FONT, 10), anchor="w").pack(fill="x")
+            line2 = "　·　".join(x for x in [
+                bio.get("position") or "",
+                ("#" + str(bio.get("jersey"))) if bio.get("jersey") else "",
+                bio.get("height") or "", bio.get("weight") or "",
+                str(bio.get("age") or ""), bio.get("college") or ""] if x)
+            if line2:
+                tk.Label(info, text=line2, bg=BG, fg=MUTED,
+                         font=(FONT, 9), anchor="w").pack(fill="x")
+            if payload.get("injured"):
+                tk.Label(info, text="傷兵名單", bg=BG, fg=LOSS,
+                         font=(FONT, 9, "bold"), anchor="w").pack(fill="x")
+            srow = tk.Frame(win, bg=BG)
+            srow.pack(fill="x", padx=14, pady=(0, 2))
+            tk.Label(srow, text="賽季", bg=BG, fg=MUTED,
+                     font=(FONT, 9)).pack(side="left")
+            st["combo_var"] = tk.StringVar(
+                value=self._card_season_label(st["season"]))
+            combo = ttk.Combobox(srow, textvariable=st["combo_var"],
+                                 state="readonly", width=10,
+                                 values=self._season_choices())
+            combo.pack(side="left", padx=6)
+            combo.bind("<<ComboboxSelected>>",
+                       lambda _e: self._reload_card_season(key))
+            st["sub"] = tk.Label(win, text="", bg=BG, fg=ACCENT,
+                                 font=(FONT, 10, "bold"), anchor="w")
+            st["sub"].pack(fill="x", padx=14, pady=(0, 6))
+            st["body"] = tk.Frame(win, bg=BG)
+            st["body"].pack(fill="x", padx=14, pady=(0, 10))
+            st["built"] = True
+        self._fill_card_stats(st, payload)
+
+    def _fill_card_stats(self, st, payload):
+        stats = payload["stats"]
         s = stats.get("season")
         sub = f"{_season_label(s)}賽季場均"
         vals = dict(stats.get("rows", []))
-        body = tk.Frame(win, bg=BG)
-        body.pack(fill="x", padx=14, pady=(2, 10))
-        tk.Label(body, text=sub if vals else sub + "　·　資料不足", bg=BG,
-                 fg=ACCENT, font=(FONT, 10, "bold"), anchor="w").pack(
-                     fill="x", pady=(0, 6))
+        st["sub"].config(text=sub if vals else sub + "　·　資料不足")
+        for child in st["body"].winfo_children():
+            child.destroy()
         for k in ("GP", "MIN", "PTS", "REB", "AST", "STL", "BLK",
                   "TO", "FGP", "TPP", "FTP"):
             if k not in vals:
                 continue
-            row = tk.Frame(body, bg=BG)
+            row = tk.Frame(st["body"], bg=BG)
             row.pack(fill="x", pady=1)
             tk.Label(row, text=self._CARD_LABELS[k], bg=BG, fg=MUTED,
                      font=(FONT, 10)).pack(side="left")
             tk.Label(row, text=vals[k], bg=BG, fg=FG,
                      font=(FONT, 11, "bold")).pack(side="right")
+
+    def _reload_card_season(self, key):
+        st = self._card_windows.get(key)
+        if st is None or not st["win"].winfo_exists():
+            return
+        year = self._season_value(st["combo_var"].get())
+        if year is None:
+            year = self.season_year()
+        if year == st["season"]:
+            return
+        st["season"] = year
+        st["sub"].config(text="載入中…")
+        for child in st["body"].winfo_children():
+            child.destroy()
+        self._async(lambda: self._player_payload(key), key)
 
     @staticmethod
     def _totals_values(totals: dict) -> tuple:

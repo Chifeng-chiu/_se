@@ -229,3 +229,6 @@ desktop.ini
 
 # HW3 team logo cache (downloaded at runtime)
 HW3/logos/
+
+# HW3 player photo cache (downloaded at runtime)
+HW3/photos/
