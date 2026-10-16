@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Docker 微服務系統展示</title>
+  <style>
+    * { box-sizing: border-box; font-family: system-ui, -apple-system, sans-serif; }
+    body { background: #0f172a; color: #f8fafc; margin: 0; padding: 2rem; }
+    .container { max-width: 900px; margin: 0 auto; }
+    h1 { color: #38bdf8; border-bottom: 1px solid #334155; padding-bottom: 0.75rem; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+    .card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 1.25rem; }
+    .badge { display: inline-block; padding: 0.25rem 0.6rem; border-radius: 999px; font-size: 0.8rem; font-weight: bold; }
+    .badge.ok { background: #065f46; color: #34d399; }
+    .badge.err { background: #7f1d1d; color: #f87171; }
+    input { flex: 1; padding: 0.6rem 1rem; border-radius: 8px; border: 1px solid #475569; background: #0f172a; color: white; }
+    button { padding: 0.6rem 1.2rem; border-radius: 8px; border: none; background: #0284c7; color: white; font-weight: bold; cursor: pointer; }
+    button:hover { background: #0369a1; }
+    button.danger { background: #b91c1c; padding: 0.3rem 0.6rem; font-size: 0.85rem; }
+    button.danger:hover { background: #991b1b; }
+    .form-row { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+    ul { list-style: none; padding: 0; margin: 0; }
+    li { background: #0f172a; padding: 0.75rem 1rem; border-radius: 8px; margin-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; border: 1px solid #1e293b; }
+    .msg-content { flex: 1; word-break: break-word; }
+    .time { color: #64748b; font-size: 0.85rem; white-space: nowrap; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🐳 Docker 微服務系統展示面板</h1>
+    
+    <div class="grid">
+      <div class="card">
+        <h3>🌐 Nginx</h3>
+        <p>反向代理與靜態伺服器</p>
+        <span class="badge ok">Running (Port 8080)</span>
+      </div>
+      <div class="card">
+        <h3>🟢 Node.js API</h3>
+        <p id="node-info">連線檢查中...</p>
+        <span id="node-badge" class="badge">Checking...</span>
+      </div>
+      <div class="card">
+        <h3>🐍 Python API</h3>
+        <p id="python-info">連線檢查中...</p>
+        <span id="python-badge" class="badge">Checking...</span>
+      </div>
+      <div class="card">
+        <h3>🐘 PostgreSQL</h3>
+        <p id="db-info">連線檢查中...</p>
+        <span id="db-badge" class="badge">Checking...</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>📝 資料庫讀寫測試 (PostgreSQL 互動)</h3>
+      <div class="form-row">
+        <input type="text" id="msgInput" placeholder="輸入一段文字寫入 PostgreSQL 資料庫..." />
+        <button onclick="addMessage()">送出儲存</button>
+      </div>
+      <ul id="msgList"></ul>
+    </div>
+  </div>
+
+  <script>
+    function esc(s) {
+      return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+
+    async function checkStatus() {
+      // Node.js + DB
+      try {
+        const res = await fetch('/api/status');
+        const data = await res.json();
+        document.getElementById('node-info').innerText = `版本: ${data.nodeVersion}`;
+        document.getElementById('node-badge').className = 'badge ok';
+        document.getElementById('node-badge').innerText = 'Online';
+
+        document.getElementById('db-info').innerText = `時間: ${new Date(data.dbTime).toLocaleTimeString()}`;
+        document.getElementById('db-badge').className = 'badge ok';
+        document.getElementById('db-badge').innerText = 'Connected';
+      } catch (e) {
+        document.getElementById('node-badge').className = 'badge err';
+        document.getElementById('node-badge').innerText = 'Offline';
+        document.getElementById('db-badge').className = 'badge err';
+        document.getElementById('db-badge').innerText = 'Disconnected';
+      }
+      // Python
+      try {
+        const res = await fetch('/api/python/status');
+        const data = await res.json();
+        document.getElementById('python-info').innerText = `v${data.pythonVersion} · CPU ${data.cpuPercent}% · MEM ${data.memoryPercent}%`;
+        document.getElementById('python-badge').className = 'badge ok';
+        document.getElementById('python-badge').innerText = 'Online';
+      } catch (e) {
+        document.getElementById('python-badge').className = 'badge err';
+        document.getElementById('python-badge').innerText = 'Offline';
+      }
+    }
+
+    async function loadMessages() {
+      const res = await fetch('/api/messages');
+      const list = await res.json();
+      const ul = document.getElementById('msgList');
+      ul.innerHTML = list.map(item => `
+        <li>
+          <span class="msg-content">${esc(item.content)}</span>
+          <span class="time">#${item.id} · ${new Date(item.created_at).toLocaleString()}</span>
+          <button class="danger" onclick="deleteMessage(${item.id})">🗑️ 刪除</button>
+        </li>
+      `).join('');
+    }
+
+    async function addMessage() {
+      const input = document.getElementById('msgInput');
+      if (!input.value.trim()) return;
+      await fetch('/api/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: input.value })
+      });
+      input.value = '';
+      loadMessages();
+    }
+
+    async function deleteMessage(id) {
+      if (!confirm(`確定刪除 #${id} 嗎？`)) return;
+      await fetch(`/api/messages/${id}`, { method: 'DELETE' });
+      loadMessages();
+    }
+
+    checkStatus();
+    loadMessages();
+  </script>
+</body>
+</html>

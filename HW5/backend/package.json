@@ -1,0 +1,13 @@
+{
+  "name": "docker-microservice-backend",
+  "version": "1.0.0",
+  "description": "Node.js microservice connected to PostgreSQL",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "pg": "^8.11.5"
+  }
+}
