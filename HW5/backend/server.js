@@ -89,6 +89,22 @@ app.delete('/api/messages/:id', async (req, res) => {
   }
 });
 
+// 修改留言
+app.put('/api/messages/:id', async (req, res) => {
+  const { content } = req.body;
+  if (!content || !content.trim()) return res.status(400).json({ error: 'Content is required' });
+  try {
+    const result = await pool.query(
+      'UPDATE messages SET content = $1 WHERE id = $2 RETURNING *',
+      [content.trim(), req.params.id]
+    );
+    if (result.rowCount === 0) return res.status(404).json({ error: 'Not found' });
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Backend service listening on port ${PORT}`);

@@ -11,6 +11,10 @@
     h1 { color: #38bdf8; border-bottom: 1px solid #334155; padding-bottom: 0.75rem; }
     .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
     .card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 1.25rem; }
+    .adminer-box { margin-bottom: 1.5rem; display: flex; flex-direction: column; gap: 0.5rem; }
+    .adminer-box a { text-decoration: none; }
+    .hint { color: #94a3b8; font-size: 0.8rem; margin: 0; }
+    .hint code { background: #0f172a; padding: 0.1rem 0.4rem; border-radius: 6px; color: #e2e8f0; }
     .badge { display: inline-block; padding: 0.25rem 0.6rem; border-radius: 999px; font-size: 0.8rem; font-weight: bold; }
     .badge.ok { background: #065f46; color: #34d399; }
     .badge.err { background: #7f1d1d; color: #f87171; }
@@ -19,16 +23,33 @@
     button:hover { background: #0369a1; }
     button.danger { background: #b91c1c; padding: 0.3rem 0.6rem; font-size: 0.85rem; }
     button.danger:hover { background: #991b1b; }
+    button.edit { background: #b45309; padding: 0.3rem 0.6rem; font-size: 0.85rem; }
+    button.edit:hover { background: #92400e; }
+    .btn-group { display: flex; gap: 0.3rem; }
     .form-row { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
     ul { list-style: none; padding: 0; margin: 0; }
     li { background: #0f172a; padding: 0.75rem 1rem; border-radius: 8px; margin-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; border: 1px solid #1e293b; }
     .msg-content { flex: 1; word-break: break-word; }
     .time { color: #64748b; font-size: 0.85rem; white-space: nowrap; }
+    .progress { background: #0f172a; border: 1px solid #334155; border-radius: 999px; height: 10px; overflow: hidden; margin: 4px 0 2px; }
+    .progress-bar { height: 100%; width: 0%; border-radius: 999px; transition: width 0.5s ease; }
+    .progress-bar.cpu { background: #38bdf8; }
+    .progress-bar.mem { background: #a78bfa; }
+    .metric-label { font-size: 0.8rem; color: #cbd5e1; display: flex; justify-content: space-between; }
   </style>
 </head>
 <body>
   <div class="container">
     <h1>🐳 Docker 微服務系統展示面板</h1>
+
+    <div class="card adminer-box">
+      <div>
+        <a href="http://localhost:8081" target="_blank" rel="noopener">
+          <button>🗄️ 開啟 Adminer 資料庫管理後台 (http://localhost:8081)</button>
+        </a>
+      </div>
+      <p class="hint">登入資訊 — 系統: <code>PostgreSQL</code> / 伺服器: <code>db</code> / 帳號: <code>myuser</code> / 密碼: <code>mypassword</code> / 資料庫: <code>mydb</code></p>
+    </div>
     
     <div class="grid">
       <div class="card">
@@ -44,6 +65,11 @@
       <div class="card">
         <h3>🐍 Python API</h3>
         <p id="python-info">連線檢查中...</p>
+        <div class="metric-label"><span>CPU</span><span id="cpu-text">--%</span></div>
+        <div class="progress"><div id="cpu-bar" class="progress-bar cpu"></div></div>
+        <div class="metric-label"><span>Memory</span><span id="mem-text">--%</span></div>
+        <div class="progress"><div id="mem-bar" class="progress-bar mem"></div></div>
+        <p id="python-uptime" class="hint">uptime: --</p>
         <span id="python-badge" class="badge">Checking...</span>
       </div>
       <div class="card">
@@ -64,12 +90,13 @@
   </div>
 
   <script>
+    let messageCache = [];
+
     function esc(s) {
       return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     }
 
-    async function checkStatus() {
-      // Node.js + DB
+    async function checkNodeStatus() {
       try {
         const res = await fetch('/api/status');
         const data = await res.json();
@@ -86,11 +113,18 @@
         document.getElementById('db-badge').className = 'badge err';
         document.getElementById('db-badge').innerText = 'Disconnected';
       }
-      // Python
+    }
+
+    async function updatePythonStatus() {
       try {
         const res = await fetch('/api/python/status');
         const data = await res.json();
-        document.getElementById('python-info').innerText = `v${data.pythonVersion} · CPU ${data.cpuPercent}% · MEM ${data.memoryPercent}%`;
+        document.getElementById('python-info').innerText = `v${data.pythonVersion} · ${data.hostname}`;
+        document.getElementById('cpu-bar').style.width = `${data.cpuPercent}%`;
+        document.getElementById('cpu-text').innerText = `${data.cpuPercent}%`;
+        document.getElementById('mem-bar').style.width = `${data.memoryPercent}%`;
+        document.getElementById('mem-text').innerText = `${data.memoryPercent}%`;
+        document.getElementById('python-uptime').innerText = `uptime: ${data.uptimeSec}s`;
         document.getElementById('python-badge').className = 'badge ok';
         document.getElementById('python-badge').innerText = 'Online';
       } catch (e) {
@@ -102,12 +136,16 @@
     async function loadMessages() {
       const res = await fetch('/api/messages');
       const list = await res.json();
+      messageCache = list;
       const ul = document.getElementById('msgList');
       ul.innerHTML = list.map(item => `
         <li>
           <span class="msg-content">${esc(item.content)}</span>
           <span class="time">#${item.id} · ${new Date(item.created_at).toLocaleString()}</span>
-          <button class="danger" onclick="deleteMessage(${item.id})">🗑️ 刪除</button>
+          <span class="btn-group">
+            <button class="edit" onclick="editMessage(${item.id})">✏️ 編輯</button>
+            <button class="danger" onclick="deleteMessage(${item.id})">🗑️ 刪除</button>
+          </span>
         </li>
       `).join('');
     }
@@ -130,7 +168,22 @@
       loadMessages();
     }
 
-    checkStatus();
+    async function editMessage(id) {
+      const old = (messageCache.find(m => m.id === id) || {}).content || '';
+      const next = prompt(`編輯留言 #${id}:`, old);
+      if (next === null) return;
+      if (!next.trim()) { alert('內容不可為空'); return; }
+      await fetch(`/api/messages/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: next })
+      });
+      loadMessages();
+    }
+
+    checkNodeStatus();
+    updatePythonStatus();
+    setInterval(updatePythonStatus, 3000);
     loadMessages();
   </script>
 </body>
