@@ -1,0 +1,43 @@
+name: test-pulse-omni
+
+services:
+  # One-shot build helper: docker compose up --build builds this image before
+  # the backend starts. The backend also self-heals by building it on first use.
+  sandbox-image:
+    build:
+      context: ./backend/sandbox
+    image: testpulse-pytest:latest
+    command: ["true"]
+    restart: "no"
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    image: testpulse-omni-backend:latest
+    init: true
+    ports:
+      - "8000:8000"
+    environment:
+      TESTPULSE_DATA_DIR: /data
+      SANDBOX_IMAGE: testpulse-pytest:latest
+      PLAYWRIGHT_BROWSERS_PATH: /ms-playwright
+      E2E_NO_SANDBOX: "1"
+      CORS_ORIGINS: "*"
+      LOG_LEVEL: INFO
+    volumes:
+      - testpulse-data:/data
+      # Linux containers on Docker Desktop can use this path. The backend uses
+      # the Docker SDK to create isolated pytest containers through the socket.
+      - /var/run/docker.sock:/var/run/docker.sock
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    shm_size: "1gb"
+    depends_on:
+      sandbox-image:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+volumes:
+  testpulse-data:
+    name: testpulse-omni-data

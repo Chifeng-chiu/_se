@@ -1,0 +1,17 @@
+# Runtime data: SQLite DB and artifacts
+backend/data/*
+!backend/data/.gitkeep
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Local tooling
+.env
+.DS_Store
+*.log

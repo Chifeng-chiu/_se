@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="zh-Hant" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TestPulse Omni · Automated Testing Platform</title>
+  <meta name="description" content="Six-dimensional automated software testing platform: unit, integration, E2E, load, security and visual regression." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            ink: '#05070d',
+            panel: '#0a0f1c',
+            line: '#1b2740',
+            pulse: '#34f5c5',
+            violet: '#8b5cf6',
+            ember: '#fb7185'
+          },
+          fontFamily: {
+            display: ['"Space Grotesk"', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace']
+          }
+        }
+      }
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.52.0/min/vs/loader.js"></script>
+  <style>
+    :root {
+      color-scheme: dark;
+      --pulse: #34f5c5;
+      --pulse-dim: rgba(52, 245, 197, .12);
+      --violet: #8b5cf6;
+      --ember: #fb7185;
+      --line: rgba(91, 118, 165, .18);
+      --panel: rgba(9, 14, 27, .82);
+    }
+    * { scrollbar-width: thin; scrollbar-color: #253657 #080d18; }
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #080d18; }
+    ::-webkit-scrollbar-thumb { background: #253657; border-radius: 99px; }
+    body {
+      font-family: 'Space Grotesk', sans-serif;
+      background:
+        radial-gradient(ellipse 80% 55% at 75% -5%, rgba(52,245,197,.10), transparent 55%),
+        radial-gradient(ellipse 65% 50% at 5% 100%, rgba(139,92,246,.11), transparent 60%),
+        #05070d;
+      min-height: 100vh;
+    }
+    .cyber-grid {
+      position: fixed; inset: 0; pointer-events: none; z-index: 0;
+      background-image:
+        linear-gradient(rgba(72, 101, 150, .045) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(72, 101, 150, .045) 1px, transparent 1px);
+      background-size: 44px 44px;
+      mask-image: linear-gradient(to bottom, black 20%, transparent 92%);
+    }
+    .glass {
+      background: linear-gradient(150deg, rgba(13, 21, 39, .88), rgba(7, 11, 22, .78));
+      border: 1px solid var(--line);
+      backdrop-filter: blur(16px);
+      box-shadow: 0 24px 70px rgba(0, 0, 0, .28), inset 0 1px 0 rgba(255,255,255,.025);
+    }
+    .nav-item {
+      position: relative; display: flex; align-items: center; gap: .75rem;
+      width: 100%; padding: .72rem .8rem; border-radius: .8rem;
+      color: #8292ae; border: 1px solid transparent;
+      transition: all .2s ease; text-align: left;
+    }
+    .nav-item:hover { color: #d7e2f5; background: rgba(41, 61, 95, .26); }
+    .nav-item.active {
+      color: #eafff9; border-color: rgba(52,245,197,.24);
+      background: linear-gradient(90deg, rgba(52,245,197,.14), rgba(52,245,197,.025));
+      box-shadow: inset 3px 0 0 var(--pulse), 0 0 28px rgba(52,245,197,.06);
+    }
+    .nav-item.active .nav-num { color: var(--pulse); }
+    .nav-item.active .nav-icon { color: var(--pulse); filter: drop-shadow(0 0 6px rgba(52,245,197,.5)); }
+    .nav-num { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #46536c; letter-spacing: .08em; }
+    .nav-icon { width: 17px; height: 17px; color: #64748b; transition: color .2s; }
+    .accent-line { background: linear-gradient(90deg, transparent, rgba(52,245,197,.5), transparent); height: 1px; }
+    .btn-primary {
+      display: inline-flex; align-items: center; justify-content: center; gap: .55rem;
+      background: linear-gradient(135deg, #34f5c5, #18c9ab);
+      color: #032019; font-weight: 700; font-size: .83rem;
+      padding: .72rem 1.1rem; border-radius: .72rem;
+      box-shadow: 0 10px 35px rgba(52,245,197,.18), inset 0 1px 0 rgba(255,255,255,.4);
+      transition: transform .15s ease, box-shadow .15s ease, filter .15s;
+    }
+    .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 14px 40px rgba(52,245,197,.28); filter: brightness(1.05); }
+    .btn-primary:active { transform: translateY(0); }
+    .btn-primary:disabled { opacity: .55; cursor: wait; transform: none; }
+    .btn-ghost {
+      display: inline-flex; align-items: center; gap: .45rem;
+      border: 1px solid var(--line); color: #9aacc7; padding: .55rem .8rem;
+      border-radius: .6rem; font-size: .75rem; transition: all .18s;
+      background: rgba(11, 18, 33, .65);
+    }
+    .btn-ghost:hover { border-color: rgba(52,245,197,.3); color: #d7fff5; }
+    .field-label { display:block; font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#7486a3; margin-bottom:.42rem; }
+    .input {
+      width: 100%; background: rgba(4, 8, 17, .8); border: 1px solid #1c2941;
+      border-radius: .62rem; color: #d7e2f3; padding: .65rem .75rem;
+      font-size: .82rem; outline: none; transition: border-color .15s, box-shadow .15s;
+    }
+    .input:focus { border-color: rgba(52,245,197,.55); box-shadow: 0 0 0 3px rgba(52,245,197,.08); }
+    .input::placeholder { color: #3e4d64; }
+    select.input { appearance: none; background-image: linear-gradient(45deg, transparent 50%, #5a6d8c 50%), linear-gradient(135deg, #5a6d8c 50%, transparent 50%); background-position: calc(100% - 15px) 50%, calc(100% - 10px) 50%; background-size: 5px 5px, 5px 5px; background-repeat: no-repeat; padding-right: 2rem; }
+    .check { appearance: none; width: 16px; height: 16px; border-radius: 4px; border: 1px solid #33445f; background: #060b15; display:inline-grid; place-content:center; cursor:pointer; }
+    .check:checked { background: var(--pulse); border-color: var(--pulse); }
+    .check:checked::after { content: ''; width: 8px; height: 5px; border-left: 2px solid #032019; border-bottom: 2px solid #032019; transform: rotate(-45deg) translate(1px,-1px); }
+    .editor-shell { height: 350px; border: 1px solid #1b2942; border-radius: .75rem; overflow: hidden; background: #070b14; }
+    .editor-shell.tall { height: 430px; }
+    .monaco-editor, .monaco-editor-background, .monaco-editor .margin { background-color: #070b14 !important; }
+    .module-panel { animation: panel-in .35s ease both; }
+    @keyframes panel-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+    .empty-state {
+      border: 1px dashed #1e2d47; border-radius: .8rem; min-height: 160px;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      color: #4e607d; gap: .65rem; text-align: center; padding: 2rem;
+      background: radial-gradient(circle at center, rgba(52,245,197,.025), transparent 60%);
+    }
+    .result-section { margin-top: 1rem; }
+    .stat-card { background: rgba(6,11,21,.62); border: 1px solid var(--line); border-radius: .8rem; padding: .9rem 1rem; }
+    .stat-value { font-family:'JetBrains Mono',monospace; font-size:1.35rem; line-height:1; color:#dffcf6; }
+    .metric-label { font-family:'JetBrains Mono',monospace; font-size:9px; letter-spacing:.1em; text-transform:uppercase; color:#607390; }
+    .badge { display:inline-flex; align-items:center; gap:.35rem; border-radius:999px; padding:.26rem .6rem; font-family:'JetBrains Mono',monospace; font-size:10px; font-weight:600; letter-spacing:.04em; border:1px solid transparent; }
+    .badge-pass { color:#5cf5cf; background:rgba(52,245,197,.1); border-color:rgba(52,245,197,.25); }
+    .badge-fail { color:#ff9bab; background:rgba(251,113,133,.1); border-color:rgba(251,113,133,.25); }
+    .badge-warn { color:#fcd34d; background:rgba(251,191,36,.08); border-color:rgba(251,191,36,.22); }
+    .badge-info { color:#a5b4fc; background:rgba(129,140,248,.09); border-color:rgba(129,140,248,.22); }
+    .result-banner { display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; padding:1rem 1.1rem; border-radius:.8rem; border:1px solid var(--line); background:rgba(6,11,21,.55); }
+    .result-banner.pass { border-color:rgba(52,245,197,.24); background:linear-gradient(100deg, rgba(52,245,197,.08), rgba(6,11,21,.5)); }
+    .result-banner.fail { border-color:rgba(251,113,133,.24); background:linear-gradient(100deg, rgba(251,113,133,.08), rgba(6,11,21,.5)); }
+    .code-block { font-family:'JetBrains Mono',monospace; font-size:11px; line-height:1.7; color:#94a8c4; background:#050912; border:1px solid #17243b; border-radius:.7rem; padding:1rem; overflow:auto; white-space:pre-wrap; word-break:break-word; }
+    .data-table { width:100%; border-collapse:collapse; font-size:12px; }
+    .data-table th { font-family:'JetBrains Mono',monospace; font-size:9px; letter-spacing:.1em; text-transform:uppercase; color:#5d708f; text-align:left; padding:.7rem .8rem; border-bottom:1px solid #18243a; }
+    .data-table td { padding:.75rem .8rem; border-bottom:1px solid rgba(24,36,58,.65); color:#91a4c1; vertical-align:top; }
+    .data-table tr:last-child td { border-bottom:none; }
+    .data-table tbody tr:hover { background:rgba(52,245,197,.025); }
+    .score-ring {
+      --score: 0; --score-color: #34f5c5; width: 116px; height: 116px; border-radius: 50%;
+      display: grid; place-items: center; position: relative;
+      background: conic-gradient(var(--score-color) calc(var(--score) * 1%), #18243a 0);
+      box-shadow: 0 0 35px color-mix(in srgb, var(--score-color) 18%, transparent);
+    }
+    .score-ring::before { content:''; position:absolute; inset:8px; border-radius:50%; background:#080d18; border:1px solid #1b2942; }
+    .score-ring > div { position:relative; z-index:1; text-align:center; }
+    .timeline-step { position: relative; padding: 0 0 1.1rem 2rem; border-left: 1px solid #22314c; margin-left: .4rem; }
+    .timeline-step:last-child { border-left-color: transparent; padding-bottom: 0; }
+    .timeline-dot { position:absolute; left:-6px; top:2px; width:11px; height:11px; border-radius:50%; border:2px solid #080d18; background:#64748b; }
+    .timeline-step.pass .timeline-dot { background:var(--pulse); box-shadow:0 0 10px rgba(52,245,197,.55); }
+    .timeline-step.fail .timeline-dot { background:var(--ember); box-shadow:0 0 10px rgba(251,113,133,.45); }
+    .finding { border:1px solid #1c2941; border-left-width:3px; border-radius:.65rem; padding:.8rem .9rem; background:rgba(6,11,21,.55); }
+    .finding.high, .finding.critical { border-left-color:var(--ember); }
+    .finding.medium { border-left-color:#f59e0b; }
+    .finding.low { border-left-color:#60a5fa; }
+    .finding.info { border-left-color:#64748b; }
+    .img-card { border:1px solid #1c2941; border-radius:.75rem; overflow:hidden; background:#060b15; }
+    .img-card img { width:100%; display:block; max-height:430px; object-fit:contain; background:#0a0f1a; }
+    .toast { position:fixed; bottom:1.4rem; right:1.4rem; z-index:80; transform:translateY(22px); opacity:0; pointer-events:none; transition:all .25s ease; }
+    .toast.show { transform:translateY(0); opacity:1; }
+    .tab-scroll::-webkit-scrollbar { height: 3px; }
+    .modal-backdrop { backdrop-filter: blur(8px); background: rgba(2,5,10,.72); }
+    .skeleton { background: linear-gradient(90deg, #0d1628 25%, #12203a 50%, #0d1628 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius:.5rem; }
+    @keyframes shimmer { to { background-position: -200% 0; } }
+    @media (max-width: 1023px) {
+      .nav-item { min-width: max-content; width:auto; padding:.6rem .75rem; }
+      .nav-item.active { box-shadow: inset 0 -2px 0 var(--pulse); }
+    }
+  </style>
+</head>
+<body class="text-slate-200 antialiased">
+  <div class="cyber-grid"></div>
+
+  <div class="relative z-10 flex min-h-screen flex-col lg:flex-row">
+    <aside class="border-b border-white/[0.055] bg-[#060a13]/80 backdrop-blur-xl lg:fixed lg:inset-y-0 lg:left-0 lg:w-[246px] lg:border-b-0 lg:border-r">
+      <div class="flex h-full flex-col px-4 py-5 lg:px-5">
+        <div class="flex items-center justify-between gap-3">
+          <div class="flex min-w-0 items-center gap-3">
+            <div class="relative grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-pulse/25 bg-pulse/[0.08] shadow-[0_0_28px_rgba(52,245,197,0.12)]">
+              <svg viewBox="0 0 24 24" class="h-5 w-5 text-pulse" fill="none" stroke="currentColor" stroke-width="1.8">
+                <path d="M2 12h4l2.2-7 3.8 14 2.4-9 1.8 5H22" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              <span class="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-pulse shadow-[0_0_8px_#34f5c5]"></span>
+            </div>
+            <div class="min-w-0">
+              <div class="whitespace-nowrap font-display text-[15px] font-bold tracking-tight text-white">TestPulse <span class="text-pulse">Omni</span></div>
+              <div class="mt-0.5 flex items-center gap-1.5 whitespace-nowrap">
+                <span class="font-mono text-[7px] uppercase tracking-[0.14em] text-slate-500">Six-dimensional QA</span>
+                <span class="h-1 w-1 rounded-full bg-slate-600"></span>
+                <span id="api-dot" class="h-1.5 w-1.5 rounded-full bg-slate-500"></span>
+                <span id="api-status" class="font-mono text-[7px] uppercase tracking-wider text-slate-400">Connecting</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="my-5 accent-line"></div>
+
+        <nav id="module-nav" class="tab-scroll flex gap-1.5 overflow-x-auto pb-1 lg:flex-col lg:overflow-visible">
+          <button class="nav-item active" data-module="unit">
+            <span class="nav-num">01</span>
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3m8 0h3a2 2 0 0 0 2-2v-3"/><path d="m9 12 2 2 4-4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span class="text-[12.5px] font-medium">單元測試</span>
+            <span class="ml-auto hidden font-mono text-[8px] text-slate-600 lg:block">PYTEST</span>
+          </button>
+          <button class="nav-item" data-module="integration">
+            <span class="nav-num">02</span>
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7" stroke-linecap="round"/></svg>
+            <span class="text-[12.5px] font-medium">整合測試</span>
+            <span class="ml-auto hidden font-mono text-[8px] text-slate-600 lg:block">CHAIN</span>
+          </button>
+          <button class="nav-item" data-module="e2e">
+            <span class="nav-num">03</span>
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="2" y="4" width="20" height="14" rx="2"/><path d="M8 21h8m-4-3v3"/><path d="m9 9 2 2-2 2m4 0h2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span class="text-[12.5px] font-medium">E2E 測試</span>
+            <span class="ml-auto hidden font-mono text-[8px] text-slate-600 lg:block">PLAYWRIGHT</span>
+          </button>
+          <button class="nav-item" data-module="load">
+            <span class="nav-num">04</span>
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 20h18M6 16v-5m4 5V7m4 9v-3m4 3V5" stroke-linecap="round"/></svg>
+            <span class="text-[12.5px] font-medium">效能與壓力</span>
+            <span class="ml-auto hidden font-mono text-[8px] text-slate-600 lg:block">HTTPX</span>
+          </button>
+          <button class="nav-item" data-module="security">
+            <span class="nav-num">05</span>
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span class="text-[12.5px] font-medium">資安測試</span>
+            <span class="ml-auto hidden font-mono text-[8px] text-slate-600 lg:block">SCANNER</span>
+          </button>
+          <button class="nav-item" data-module="visual">
+            <span class="nav-num">06</span>
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+            <span class="text-[12.5px] font-medium">視覺回歸</span>
+            <span class="ml-auto hidden font-mono text-[8px] text-slate-600 lg:block">PIXEL DIFF</span>
+          </button>
+        </nav>
+
+        <div class="mt-auto hidden lg:block">
+          <div class="mb-4 accent-line"></div>
+          <div class="rounded-xl border border-white/[0.055] bg-white/[0.018] p-3">
+            <div class="mb-2 flex items-center justify-between">
+              <span class="font-mono text-[8px] uppercase tracking-wider text-slate-500">Global telemetry</span>
+              <span class="h-1 w-1 rounded-full bg-pulse"></span>
+            </div>
+            <div class="flex items-end justify-between">
+              <div>
+                <div id="sidebar-runs" class="font-mono text-xl font-semibold text-white">0</div>
+                <div class="font-mono text-[8px] uppercase tracking-wider text-slate-600">test runs</div>
+              </div>
+              <div class="text-right">
+                <div id="sidebar-rate" class="font-mono text-sm font-semibold text-pulse">—</div>
+                <div class="font-mono text-[8px] uppercase tracking-wider text-slate-600">pass rate</div>
+              </div>
+            </div>
+          </div>
+          <a href="/docs" target="_blank" class="mt-3 flex items-center justify-between rounded-lg px-2 py-2 text-[10px] text-slate-500 transition hover:text-pulse">
+            <span class="font-mono uppercase tracking-wider">API reference</span>
+            <span>↗</span>
+          </a>
+        </div>
+      </div>
+    </aside>
+
+    <main class="min-w-0 flex-1 lg:ml-[246px]">
+      <div class="mx-auto max-w-[1500px] px-4 py-6 sm:px-6 lg:px-8 lg:py-7">
+        <header class="mb-6 flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+          <div>
+            <div id="module-kicker" class="mb-2 flex items-center gap-2 font-mono text-[9px] uppercase tracking-[0.2em] text-pulse/80">
+              <span class="h-px w-5 bg-pulse/40"></span> Module 01 / Unit
+            </div>
+            <h1 id="module-title" class="font-display text-2xl font-bold tracking-tight text-white sm:text-[28px]">單元測試沙箱</h1>
+            <p id="module-description" class="mt-1.5 max-w-2xl text-[12.5px] leading-relaxed text-slate-500">在無網路的 Docker 容器中執行 pytest，隔離使用者程式碼並捕捉測試結果。</p>
+          </div>
+          <div class="grid grid-cols-3 gap-2 sm:gap-3">
+            <div class="stat-card min-w-[92px]">
+              <div class="metric-label">Total runs</div>
+              <div id="stat-total" class="stat-value mt-2">0</div>
+            </div>
+            <div class="stat-card min-w-[92px]">
+              <div class="metric-label">Pass rate</div>
+              <div id="stat-pass-rate" class="stat-value mt-2 text-pulse">—</div>
+            </div>
+            <div class="stat-card min-w-[92px]">
+              <div class="metric-label">Avg latency</div>
+              <div id="stat-avg" class="stat-value mt-2">—</div>
+            </div>
+          </div>
+        </header>
+
+        <!-- ============================== UNIT ============================== -->
+        <section class="module-panel" data-panel="unit">
+          <div class="grid gap-4 xl:grid-cols-2">
+            <div class="glass rounded-2xl p-4 sm:p-5">
+              <div class="mb-3 flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                  <span class="h-1.5 w-1.5 rounded-full bg-pulse"></span>
+                  <span class="font-mono text-[10px] uppercase tracking-[0.15em] text-slate-400">solution.py</span>
+                </div>
+                <button id="unit-example" class="btn-ghost !py-1 !text-[10px]">載入範例</button>
+              </div>
+              <div id="unit-code" class="editor-shell"></div>
+            </div>
+            <div class="glass rounded-2xl p-4 sm:p-5">
+              <div class="mb-3 flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                  <span class="h-1.5 w-1.5 rounded-full bg-violet"></span>
+                  <span class="font-mono text-[10px] uppercase tracking-[0.15em] text-slate-400">test_solution.py</span>
+                </div>
+                <span class="font-mono text-[9px] text-slate-600">pytest</span>
+              </div>
+              <div id="unit-tests" class="editor-shell"></div>
+            </div>
+          </div>
+
+          <div class="mt-4 flex flex-col gap-3 rounded-xl border border-line/70 bg-panel/40 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <div class="flex flex-wrap items-center gap-4">
+              <label class="flex items-center gap-2 text-[11px] text-slate-400">Timeout
+                <select id="unit-timeout" class="input !w-20 !py-1.5 !text-[11px]">
+                  <option value="5">5s</option>
+                  <option value="3">3s</option>
+                  <option value="8">8s</option>
+                  <option value="10">10s</option>
+                </select>
+              </label>
+              <div class="flex items-center gap-2 font-mono text-[9px] uppercase tracking-wider text-slate-600">
+                <span class="h-1.5 w-1.5 rounded-full bg-pulse/70"></span> network disabled · 256MB · 0.5 CPU
+              </div>
+            </div>
+            <button id="unit-run" class="btn-primary">
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+              Run in sandbox
+            </button>
+          </div>
+          <div id="unit-result" class="result-section">
+            <div class="empty-state">
+              <svg class="h-8 w-8 text-slate-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="m8 9 3 3-3 3m6 0h2"/><rect x="3" y="4" width="18" height="16" rx="2"/></svg>
+              <div class="text-[12px]">尚未執行測試</div>
+              <div class="font-mono text-[9px] uppercase tracking-widest text-slate-700">Docker sandbox output will appear here</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============================ INTEGRATION ============================ -->
+        <section class="module-panel hidden" data-panel="integration">
+          <div class="glass rounded-2xl p-4 sm:p-5">
+            <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <div class="font-mono text-[10px] uppercase tracking-[0.15em] text-slate-400">chain.json</div>
+                <div class="mt-1 text-[11px] text-slate-600">使用 <code class="rounded bg-white/[0.04] px-1 font-mono text-pulse/80">{{token}}</code> 或 <code class="rounded bg-white/[0.04] px-1 font-mono text-pulse/80">{{steps.0.body.id}}</code> 串接資料流</div>
+              </div>
+              <button id="integration-example" class="btn-ghost">載入範例鏈</button>
+            </div>
+            <div id="integration-editor" class="editor-shell tall"></div>
+          </div>
+          <div class="mt-4 flex flex-col gap-3 rounded-xl border border-line/70 bg-panel/40 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <div class="flex flex-wrap items-center gap-4">
+              <label class="flex items-center gap-2 text-[11px] text-slate-400">
+                <input id="integration-stop" type="checkbox" class="check" checked /> 失敗即停止
+              </label>
+              <label class="flex items-center gap-2 text-[11px] text-slate-400">Step timeout
+                <select id="integration-timeout" class="input !w-24 !py-1.5 !text-[11px]">
+                  <option value="15">15s</option>
+                  <option value="5">5s</option>
+                  <option value="30">30s</option>
+                </select>
+              </label>
+            </div>
+            <button id="integration-run" class="btn-primary">
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+              Execute chain
+            </button>
+          </div>
+          <div id="integration-result" class="result-section">
+            <div class="empty-state">
+              <svg class="h-8 w-8 text-slate-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M10 13a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1"/></svg>
+              <div class="text-[12px]">定義 API 測試鏈後執行</div>
+              <div class="font-mono text-[9px] uppercase tracking-widest text-slate-700">Stateful request sequence · data-flow assertions</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ================================ E2E ================================ -->
+        <section class="module-panel hidden" data-panel="e2e">
+          <div class="glass rounded-2xl p-4 sm:p-5">
+            <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <div class="xl:col-span-2">
+                <label class="field-label" for="e2e-url">Target URL</label>
+                <input id="e2e-url" class="input" placeholder="https://example.com" value="https://example.com" />
+              </div>
+              <div>
+                <label class="field-label" for="e2e-title">Expected title</label>
+                <input id="e2e-title" class="input" placeholder="Example Domain" value="Example Domain" />
+              </div>
+              <div>
+                <label class="field-label" for="e2e-title-match">Title match</label>
+                <select id="e2e-title-match" class="input">
+                  <option value="contains">contains</option>
+                  <option value="exact">exact</option>
+                  <option value="regex">regex</option>
+                </select>
+              </div>
+              <div>
+                <label class="field-label" for="e2e-selector">Selector must exist</label>
+                <input id="e2e-selector" class="input font-mono" placeholder="h1" />
+              </div>
+              <div>
+                <label class="field-label" for="e2e-click">Click selector</label>
+                <input id="e2e-click" class="input font-mono" placeholder="button[type=submit]" />
+              </div>
+              <div>
+                <label class="field-label" for="e2e-text">Expected text</label>
+                <input id="e2e-text" class="input" placeholder="Welcome" />
+              </div>
+              <div>
+                <label class="field-label" for="e2e-text-selector">Text selector</label>
+                <input id="e2e-text-selector" class="input font-mono" placeholder="body (default)" />
+              </div>
+              <div>
+                <label class="field-label" for="e2e-wait-selector">Wait for selector</label>
+                <input id="e2e-wait-selector" class="input font-mono" placeholder="#app-ready" />
+              </div>
+              <div>
+                <label class="field-label" for="e2e-url-contains">URL contains after click</label>
+                <input id="e2e-url-contains" class="input font-mono" placeholder="/dashboard" />
+              </div>
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="field-label" for="e2e-viewport-width">Viewport W</label>
+                  <input id="e2e-viewport-width" type="number" class="input" value="1280" min="320" max="3840" />
+                </div>
+                <div>
+                  <label class="field-label" for="e2e-viewport-height">H</label>
+                  <input id="e2e-viewport-height" type="number" class="input" value="720" min="240" max="2160" />
+                </div>
+              </div>
+              <div>
+                <label class="field-label" for="e2e-timeout">Browser timeout (ms)</label>
+                <select id="e2e-timeout" class="input">
+                  <option value="15000">15,000</option>
+                  <option value="5000">5,000</option>
+                  <option value="30000">30,000</option>
+                  <option value="60000">60,000</option>
+                </select>
+              </div>
+            </div>
+            <div class="mt-4 flex flex-wrap items-center gap-5 border-t border-white/[0.05] pt-4">
+              <label class="flex items-center gap-2 text-[11px] text-slate-400"><input id="e2e-screenshot" type="checkbox" class="check" checked /> 擷取畫面</label>
+              <label class="flex items-center gap-2 text-[11px] text-slate-400"><input id="e2e-full-page" type="checkbox" class="check" checked /> 全頁截圖</label>
+              <div class="ml-auto"><button id="e2e-run" class="btn-primary"><svg class="h-4 w-4" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>Run browser test</button></div>
+            </div>
+          </div>
+          <div id="e2e-result" class="result-section">
+            <div class="empty-state">
+              <svg class="h-8 w-8 text-slate-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="2" y="4" width="20" height="14" rx="2"/><path d="M8 21h8m-4-3v3"/></svg>
+              <div class="text-[12px]">Headless Chromium 尚未啟動</div>
+              <div class="font-mono text-[9px] uppercase tracking-widest text-slate-700">Click assertions · console errors · screenshot</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- =============================== LOAD =============================== -->
+        <section class="module-panel hidden" data-panel="load">
+          <div class="glass rounded-2xl p-4 sm:p-5">
+            <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
+              <div class="xl:col-span-2">
+                <label class="field-label" for="load-url">Target URL</label>
+                <input id="load-url" class="input" placeholder="https://httpbin.org/get" value="https://httpbin.org/get" />
+              </div>
+              <div>
+                <label class="field-label" for="load-method">Method</label>
+                <select id="load-method" class="input"><option>GET</option><option>POST</option><option>PUT</option><option>PATCH</option><option>DELETE</option><option>HEAD</option></select>
+              </div>
+              <div>
+                <label class="field-label" for="load-concurrency">Concurrency</label>
+                <input id="load-concurrency" type="number" class="input" value="20" min="1" max="100" />
+              </div>
+              <div>
+                <label class="field-label" for="load-total">Total requests</label>
+                <input id="load-total" type="number" class="input" value="100" min="1" max="2000" />
+              </div>
+              <div>
+                <label class="field-label" for="load-timeout">Timeout (s)</label>
+                <input id="load-timeout" type="number" class="input" value="10" min="1" max="60" />
+              </div>
+            </div>
+            <div class="mt-4 flex flex-col gap-3 border-t border-white/[0.05] pt-4 sm:flex-row sm:items-center sm:justify-between">
+              <label class="flex items-center gap-2 text-[11px] text-slate-400">Minimum success rate
+                <select id="load-min-success" class="input !w-24 !py-1.5 !text-[11px]">
+                  <option value="0.95">95%</option>
+                  <option value="0.99">99%</option>
+                  <option value="1">100%</option>
+                  <option value="0">No gate</option>
+                </select>
+              </label>
+              <button id="load-run" class="btn-primary"><svg class="h-4 w-4" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>Start load test</button>
+            </div>
+          </div>
+          <div id="load-result" class="result-section">
+            <div class="empty-state">
+              <svg class="h-8 w-8 text-slate-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M3 20h18M6 16v-5m4 5V7m4 9v-3m4 3V5"/></svg>
+              <div class="text-[12px]">壓力測試尚未開始</div>
+              <div class="font-mono text-[9px] uppercase tracking-widest text-slate-700">RPS · latency percentiles · Chart.js timeline</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============================== SECURITY ============================== -->
+        <section class="module-panel hidden" data-panel="security">
+          <div class="glass rounded-2xl p-4 sm:p-5">
+            <div class="grid gap-4 md:grid-cols-[1fr_150px_auto] md:items-end">
+              <div>
+                <label class="field-label" for="sec-url">Target URL</label>
+                <input id="sec-url" class="input" placeholder="https://example.com/?q=test" value="https://example.com" />
+              </div>
+              <div>
+                <label class="field-label" for="sec-timeout">Request timeout</label>
+                <select id="sec-timeout" class="input">
+                  <option value="10">10 seconds</option>
+                  <option value="5">5 seconds</option>
+                  <option value="20">20 seconds</option>
+                </select>
+              </div>
+              <button id="sec-run" class="btn-primary"><svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/></svg>Scan target</button>
+            </div>
+            <div class="mt-3 font-mono text-[9px] uppercase tracking-wider text-slate-600">GET-only probes · header audit · cookie flags · CORS · reflection detection</div>
+          </div>
+          <div id="sec-result" class="result-section">
+            <div class="empty-state">
+              <svg class="h-8 w-8 text-slate-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/></svg>
+              <div class="text-[12px]">尚未執行資安掃描</div>
+              <div class="font-mono text-[9px] uppercase tracking-widest text-slate-700">Risk score · security headers · findings</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- =============================== VISUAL =============================== -->
+        <section class="module-panel hidden" data-panel="visual">
+          <div class="glass rounded-2xl p-4 sm:p-5">
+            <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-7">
+              <div class="xl:col-span-2">
+                <label class="field-label" for="visual-url">Target URL</label>
+                <input id="visual-url" class="input" placeholder="https://example.com" value="https://example.com" />
+              </div>
+              <div class="grid grid-cols-2 gap-2 xl:col-span-2">
+                <div><label class="field-label" for="visual-width">Viewport W</label><input id="visual-width" type="number" class="input" value="1280" min="320" max="3840" /></div>
+                <div><label class="field-label" for="visual-height">H</label><input id="visual-height" type="number" class="input" value="720" min="240" max="2160" /></div>
+              </div>
+              <div>
+                <label class="field-label" for="visual-threshold">Max diff %</label>
+                <input id="visual-threshold" type="number" class="input" value="0.5" min="0" max="100" step="0.01" />
+              </div>
+              <div>
+                <label class="field-label" for="visual-pixel">Pixel tolerance</label>
+                <input id="visual-pixel" type="number" class="input" value="20" min="0" max="255" />
+              </div>
+              <div>
+                <label class="field-label" for="visual-wait">Settle wait (s)</label>
+                <input id="visual-wait" type="number" class="input" value="0.5" min="0" max="10" step="0.1" />
+              </div>
+            </div>
+            <div class="mt-4 flex flex-wrap items-center gap-5 border-t border-white/[0.05] pt-4">
+              <label class="flex items-center gap-2 text-[11px] text-slate-400"><input id="visual-full" type="checkbox" class="check" checked /> 全頁截圖</label>
+              <label class="flex items-center gap-2 text-[11px] text-slate-400"><input id="visual-fail-size" type="checkbox" class="check" checked /> 尺寸變更視為失敗</label>
+              <label class="flex items-center gap-2 text-[11px] text-amber-300/80"><input id="visual-update" type="checkbox" class="check" /> 更新 Baseline</label>
+              <div class="ml-auto"><button id="visual-run" class="btn-primary"><svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>Capture &amp; compare</button></div>
+            </div>
+          </div>
+          <div id="visual-result" class="result-section">
+            <div class="empty-state">
+              <svg class="h-8 w-8 text-slate-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+              <div class="text-[12px]">第一次執行會建立 baseline</div>
+              <div class="font-mono text-[9px] uppercase tracking-widest text-slate-700">Baseline · current · red-highlighted diff</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============================== HISTORY ============================== -->
+        <section class="mt-6">
+          <div class="glass overflow-hidden rounded-2xl">
+            <div class="flex items-center justify-between border-b border-white/[0.06] px-4 py-3.5 sm:px-5">
+              <div class="flex items-center gap-2.5">
+                <span class="h-1.5 w-1.5 rounded-full bg-violet"></span>
+                <h2 class="font-mono text-[10px] uppercase tracking-[0.16em] text-slate-400">Execution history</h2>
+                <span id="history-count" class="rounded-full border border-white/[0.07] px-2 py-0.5 font-mono text-[8px] text-slate-500">0</span>
+              </div>
+              <button id="refresh-history" class="btn-ghost !py-1.5 !text-[10px]">↻ Refresh</button>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="data-table">
+                <thead><tr><th>Status</th><th>Module</th><th>Target / summary</th><th>Score</th><th>Duration</th><th>Time</th><th></th></tr></thead>
+                <tbody id="history-body">
+                  <tr><td colspan="7" class="py-8 text-center font-mono text-[10px] uppercase tracking-wider text-slate-600">Loading history…</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <footer class="mt-6 flex flex-col gap-2 border-t border-white/[0.04] py-5 font-mono text-[9px] uppercase tracking-wider text-slate-700 sm:flex-row sm:items-center sm:justify-between">
+          <span>TestPulse Omni · FastAPI + pytest + Playwright + httpx + Pillow</span>
+          <span class="flex items-center gap-1.5"><span class="h-1 w-1 rounded-full bg-pulse/70"></span> Local-first · no external test cloud</span>
+        </footer>
+      </div>
+    </main>
+  </div>
+
+  <div id="toast" class="toast">
+    <div class="flex items-center gap-2.5 rounded-xl border border-line bg-[#0a1220]/95 px-4 py-3 shadow-2xl backdrop-blur-xl">
+      <span id="toast-icon" class="grid h-6 w-6 place-items-center rounded-full bg-pulse/10 text-pulse">✓</span>
+      <span id="toast-message" class="text-[12px] text-slate-300">Done</span>
+    </div>
+  </div>
+
+  <div id="detail-modal" class="fixed inset-0 z-[70] hidden items-center justify-center p-4">
+    <div id="detail-backdrop" class="modal-backdrop absolute inset-0"></div>
+    <div class="relative flex max-h-[85vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-line bg-[#080d18] shadow-2xl">
+      <div class="flex items-center justify-between border-b border-white/[0.06] px-5 py-4">
+        <div>
+          <div class="font-mono text-[9px] uppercase tracking-[0.16em] text-pulse/80">History detail</div>
+          <h3 id="detail-modal-title" class="mt-1 font-display text-lg font-semibold text-white">Execution</h3>
+        </div>
+        <button id="detail-close" class="grid h-8 w-8 place-items-center rounded-lg border border-line text-slate-500 hover:border-ember/40 hover:text-ember">✕</button>
+      </div>
+      <pre id="detail-json" class="code-block m-4 overflow-auto"></pre>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
