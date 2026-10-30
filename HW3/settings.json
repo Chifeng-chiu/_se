@@ -10,5 +10,5 @@
   "preview_days": 7,
   "autostart": true,
   "start_minimized": false,
-  "mini_widget": false
+  "mini_widget": true
 }
