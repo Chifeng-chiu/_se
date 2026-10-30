@@ -1,0 +1,70 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  background: #070d18;
+  color: #e2e8f0;
+  font-family: "Noto Sans TC", "Microsoft JhengHei", system-ui, sans-serif;
+}
+
+/* 細捲軸 (法醫深色風) */
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: #24365a;
+  border-radius: 8px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+mark.scam {
+  background: rgba(234, 179, 8, 0.35);
+  color: #fde68a;
+  border-bottom: 2px solid #eab308;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+/* 正式鑑識報告列印：只印白底報告本體 */
+.print-sheet {
+  color: #000;
+}
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: #fff !important;
+  }
+  /* 全螢幕遮罩在列印時還原為一般文件流 */
+  .fixed.inset-0.z-50 {
+    position: static !important;
+    background: #fff !important;
+    padding: 0 !important;
+  }
+  #print-report {
+    max-width: 100% !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+  @page {
+    size: A4;
+    margin: 12mm;
+  }
+}
+
+@keyframes pulse-red {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.55); }
+  50% { box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
+}
+.danger-glow {
+  animation: pulse-red 1.6s ease-out infinite;
+}
