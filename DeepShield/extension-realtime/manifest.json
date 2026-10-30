@@ -1,0 +1,38 @@
+{
+  "manifest_version": 3,
+  "name": "DeepShield 即時防護盾",
+  "version": "0.2.0",
+  "description": "模式 B：即時影音深偽與詐騙話術預警。每 2 秒快掃，綠黃紅燈即時示警，一鍵送交深度鑑識。",
+  "permissions": ["storage", "scripting"],
+  "host_permissions": ["http://localhost:8000/*", "http://localhost:5173/*"],
+  "background": { "service_worker": "src/background.js" },
+  "action": {
+    "default_popup": "src/popup.html",
+    "default_title": "DeepShield 防護盾",
+    "default_icon": {
+      "16": "icons/shield-16.png",
+      "48": "icons/shield-48.png",
+      "128": "icons/shield-128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/shield-16.png",
+    "48": "icons/shield-48.png",
+    "128": "icons/shield-128.png"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "exclude_matches": ["http://localhost:5173/*"],
+      "js": ["src/content.js"],
+      "run_at": "document_idle",
+      "all_frames": false
+    },
+    {
+      "matches": ["http://localhost:5173/*"],
+      "js": ["src/bridge.js"],
+      "run_at": "document_start",
+      "all_frames": false
+    }
+  ]
+}

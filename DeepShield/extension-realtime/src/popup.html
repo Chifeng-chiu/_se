@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<style>
+  body { width: 280px; margin: 0; padding: 14px; background: #0b1220; color: #e2e8f0;
+         font-family: system-ui, sans-serif; font-size: 13px; }
+  h1 { font-size: 15px; margin: 0 0 8px; }
+  .row { display: flex; gap: 8px; margin-top: 10px; }
+  button { flex: 1; border: 1px solid #334155; background: #16233c; color: #e2e8f0;
+           border-radius: 8px; padding: 8px 6px; font-size: 12px; cursor: pointer; }
+  button:hover { border-color: #60a5fa; }
+  #status { margin-top: 8px; font-size: 12px; color: #94a3b8; }
+  code { font-size: 11px; color: #7dd3fc; word-break: break-all; }
+</style>
+</head>
+<body>
+  <h1>🛡️ DeepShield 即時防護盾</h1>
+  <div id="status">後端檢測中…</div>
+  <div class="row">
+    <button id="openDash">開啟鑑識中心</button>
+    <button id="openDocs">後端文件</button>
+  </div>
+  <div style="margin-top:10px;font-size:11px;color:#64748b;">
+    即時掃描端點：<br /><code>ws://localhost:8000/api/v1/ws/realtime-scan</code><br />
+    頁面右下角盾牌可拖曳，點擊展開監控面板。
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>

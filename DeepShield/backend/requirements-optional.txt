@@ -1,0 +1,9 @@
+# 選配: 有裝才啟用, 沒裝後端自動降級 (不影響啟動)
+# mediapipe 在新版 Python 可能尚無 wheel, 安裝失敗請直接略過
+mediapipe>=0.10.9
+onnxruntime>=1.17.0
+# torch>=2.2.0
+# 語音轉文字 (STT)：解鎖詐騙語意逐字稿維度；av 需 <19 (19 版刪除了 faster-whisper 用的參數)
+# opencc 已移入核心依賴 (簡繁正規化，純 Python 輕量)
+faster-whisper>=1.0.0
+av>=14,<19
