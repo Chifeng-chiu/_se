@@ -3,7 +3,7 @@
 | 1 | curl | 是 | | [HW1](https://github.com/Chifeng-chiu/_se/tree/main/HW1) |
 | 2 | 校務系統 | 是 | | [HW2](https://github.com/Chifeng-chiu/_se/tree/main/HW2) |
 | 3 | 有價值專案 | 是 | | [HW3](https://github.com/Chifeng-chiu/_se/tree/main/HW3) |
-| 4 | git flow | 否 | 是 | [HW4](https://github.com/Chifeng-chiu/_se/tree/main/HW4) |
+| 4 | git flow | 是 |  | [HW4](https://github.com/Chifeng-chiu/_se/tree/main/HW4) |
 | 5 | (放假) | 是 | | |
 | 6 | docker | 是 | | [HW5](https://github.com/Chifeng-chiu/_se/tree/main/HW5) |
 | 7 | 網站測試 | 是 | | [HW6](https://github.com/Chifeng-chiu/_se/tree/main/HW6) |
