@@ -1,80 +1,11 @@
-# 期中作業
-
-> 現代軟體工程 — 115 學年上學期期中作業
-
-## 基本資訊
-
-| 欄位 | 內容 |
-| --- | --- |
-| 課程 | 現代軟體工程 |
-| 學期 | 115 學年上學期 |
-| 教師 | [陳鍾誠](https://www.nqu.edu.tw/educsie/index.php?act=blog&code=list&ids=4) |
-| 學校 | [金門大學資訊工程系](https://www.nqu.edu.tw/educsie/index.php) |
-| 學生 | 邱祺峰 |
-| 學號 | 43 |
-
-## 專案主題
-
-<!-- TODO: 填上期中作業的專案名稱 -->
-
-（待補）
-
-## 專案簡介
-
-<!-- TODO: 用 2～3 段說明這個專案要解決什麼問題、主要功能與目標使用者 -->
-
-（待補）
-
-## 功能清單
-
-<!-- TODO: 依實際完成的功能逐項勾選 -->
-
-- [ ] 功能一
-- [ ] 功能二
-- [ ] 功能三
-
-## 使用技術
-
-<!-- TODO: 列出前端、後端、資料庫、部署工具等 -->
-
-| 類別 | 技術 |
-| --- | --- |
-| 前端 | （待補） |
-| 後端 | （待補） |
-| 資料庫 | （待補） |
-| 其他 | （待補） |
-
-## 專案結構
-
-<!-- TODO: 完成後更新為實際的目錄結構 -->
-
-```text
-期中作業/
-├── README.md
-└── （待補）
-```
-
-## 執行方式
-
-<!-- TODO: 補上安裝、啟動與使用步驟 -->
-
-```bash
-# 待補
-```
-
-## 組員與分工
-
-| 姓名 | 學號 | 負責項目 |
-| --- | --- | --- |
-| 邱祺峰 | 43 | （待補） |
-
-## 繳交項目
-
-- [ ] 原始碼
-- [ ] 操作說明／README
-- [ ] 展示截圖或影片
-- [ ] 口頭報告投影片
-
-## 備註
-
-本文件為期中作業的說明模板，內容會隨著專案開發持續更新。
+| 第幾週 | 習題內容 | 有上課且準時繳交 | 補交且附上請假證明 | 作業連結 |
+| :---: | :---: | :---: | :---: | :---: |
+| 1 | curl | 是 | | [HW1](https://github.com/Chifeng-chiu/_se/tree/main/HW1) |
+| 2 | 校務系統 | 是 | | [HW2](https://github.com/Chifeng-chiu/_se/tree/main/HW2) |
+| 3 | 有價值專案 | 是 | | [HW3](https://github.com/Chifeng-chiu/_se/tree/main/HW3) |
+| 4 | git flow | 否 | 是 | [HW4](https://github.com/Chifeng-chiu/_se/tree/main/HW4) |
+| 5 | (放假) | 是 | | |
+| 6 | docker | 是 | | [HW5](https://github.com/Chifeng-chiu/_se/tree/main/HW5) |
+| 7 | 網站測試 | 是 | | [HW6](https://github.com/Chifeng-chiu/_se/tree/main/HW6) |
+| 8 | 有價值專案 | 是 | | [DeepShield](https://github.com/Chifeng-chiu/_se/tree/main/DeepShield) |
+| 9 | cloudflare 網站專案 | 是 | | |[網站](https://frosty-king-4c81.s111410543.workers.dev/)
