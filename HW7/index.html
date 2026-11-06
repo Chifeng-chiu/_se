@@ -1,0 +1,3997 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#02070b" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%2302070b'/%3E%3Ccircle cx='32' cy='32' r='17' fill='none' stroke='%2363f5df' stroke-width='2'/%3E%3Ccircle cx='32' cy='32' r='7' fill='%2363f5df'/%3E%3Cpath d='M32 2v8M32 54v8M2 32h8M54 32h8' stroke='%23f6b86b' stroke-width='2'/%3E%3C/svg%3E" />
+  <title>Kinmen 3D 暗空與光影足跡地圖</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=Noto+Sans+TC:wght@300;400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            ink: '#02070b',
+            cyan: '#63f5df',
+            amber: '#f6b86b'
+          },
+          fontFamily: {
+            display: ['Space Grotesk', 'Noto Sans TC', 'sans-serif'],
+            sans: ['Noto Sans TC', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace']
+          }
+        }
+      }
+    };
+  </script>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/exif-js/2.3.0/exif.min.js"></script>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+
+  <style>
+    :root {
+      --ink: #02070b;
+      --ink-2: #061119;
+      --cyan: #63f5df;
+      --cyan-soft: #b9fff3;
+      --amber: #f6b86b;
+      --pearl: #eafbf7;
+      --muted: #7d9a9b;
+      --line: rgba(120, 238, 222, 0.16);
+      --line-strong: rgba(120, 238, 222, 0.32);
+      --panel: rgba(5, 16, 23, 0.78);
+    }
+
+    * { box-sizing: border-box; }
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #02070b;
+      color: var(--pearl);
+    }
+    body {
+      font-family: 'Noto Sans TC', sans-serif;
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+      overscroll-behavior: none;
+    }
+    ::selection { background: rgba(99, 245, 223, 0.28); color: #fff; }
+    button, input { font: inherit; }
+    button { color: inherit; }
+    a { color: inherit; }
+
+    .mono { font-family: 'JetBrains Mono', monospace; }
+    .display { font-family: 'Space Grotesk', 'Noto Sans TC', sans-serif; }
+
+    #scene {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      z-index: 2;
+      outline: none;
+      touch-action: none;
+    }
+
+    .nebula {
+      position: fixed;
+      inset: -32%;
+      z-index: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(ellipse 38% 30% at 28% 24%, rgba(22, 151, 143, 0.17), transparent 66%),
+        radial-gradient(ellipse 34% 28% at 73% 64%, rgba(218, 143, 74, 0.12), transparent 68%),
+        radial-gradient(ellipse 28% 24% at 55% 12%, rgba(65, 74, 155, 0.13), transparent 70%);
+      filter: blur(48px);
+      animation: nebulaShift 28s ease-in-out infinite alternate;
+      will-change: transform;
+    }
+    .nebula.second {
+      inset: -28%;
+      opacity: 0.62;
+      background:
+        radial-gradient(ellipse 22% 18% at 66% 31%, rgba(44, 192, 198, 0.1), transparent 72%),
+        radial-gradient(ellipse 26% 20% at 20% 72%, rgba(236, 156, 87, 0.08), transparent 72%);
+      animation-duration: 38s;
+      animation-direction: alternate-reverse;
+    }
+
+    .grain {
+      position: fixed;
+      inset: 0;
+      z-index: 3;
+      pointer-events: none;
+      opacity: 0.055;
+      background-image: radial-gradient(rgba(255, 255, 255, 0.8) 0.5px, transparent 0.6px);
+      background-size: 3px 3px;
+      mix-blend-mode: overlay;
+    }
+    .scanlines {
+      position: fixed;
+      inset: 0;
+      z-index: 3;
+      pointer-events: none;
+      opacity: 0.32;
+      background: repeating-linear-gradient(to bottom, rgba(255, 255, 255, 0.025) 0, rgba(255, 255, 255, 0.025) 1px, transparent 1px, transparent 4px);
+    }
+    .vignette {
+      position: fixed;
+      inset: 0;
+      z-index: 4;
+      pointer-events: none;
+      background: radial-gradient(ellipse at center, transparent 34%, rgba(0, 4, 8, 0.34) 72%, rgba(0, 3, 6, 0.82) 100%);
+    }
+
+    .screen-corners {
+      position: fixed;
+      inset: 12px;
+      z-index: 5;
+      pointer-events: none;
+      opacity: 0.6;
+    }
+    .screen-corners i {
+      position: absolute;
+      width: 19px;
+      height: 19px;
+      border-color: rgba(154, 255, 240, 0.35);
+      border-style: solid;
+    }
+    .screen-corners i:nth-child(1) { top: 0; left: 0; border-width: 1px 0 0 1px; }
+    .screen-corners i:nth-child(2) { top: 0; right: 0; border-width: 1px 1px 0 0; }
+    .screen-corners i:nth-child(3) { bottom: 0; left: 0; border-width: 0 0 1px 1px; }
+    .screen-corners i:nth-child(4) { bottom: 0; right: 0; border-width: 0 1px 1px 0; }
+
+    .meteor {
+      position: fixed;
+      top: 13%;
+      left: 72%;
+      width: 180px;
+      height: 1px;
+      z-index: 1;
+      pointer-events: none;
+      opacity: 0;
+      background: linear-gradient(90deg, transparent, rgba(198, 255, 248, 0.85), transparent);
+      transform: rotate(-26deg);
+      filter: drop-shadow(0 0 6px rgba(99, 245, 223, 0.65));
+      animation: meteorFall 13s linear infinite 4s;
+    }
+    .meteor.two {
+      top: 31%;
+      left: 16%;
+      width: 100px;
+      animation-duration: 19s;
+      animation-delay: 11s;
+      opacity: 0;
+    }
+
+    .ui { position: fixed; z-index: 30; }
+    .ui-header {
+      top: 0;
+      left: 0;
+      right: 0;
+      padding: 20px 22px;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 20px;
+      pointer-events: none;
+    }
+    .ui-header > * { pointer-events: auto; }
+
+    .brand { display: flex; align-items: flex-start; gap: 14px; }
+    .logo-orbit {
+      width: 48px;
+      height: 48px;
+      flex: 0 0 auto;
+      position: relative;
+      border-radius: 50%;
+      border: 1px solid rgba(117, 255, 235, 0.22);
+      background: radial-gradient(circle at 50% 50%, rgba(55, 204, 188, 0.18), transparent 64%);
+      box-shadow: 0 0 30px rgba(30, 214, 195, 0.12), inset 0 0 18px rgba(30, 214, 195, 0.08);
+    }
+    .logo-orbit::before {
+      content: '';
+      position: absolute;
+      inset: 12px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 38% 35%, #d9fff8, var(--cyan) 22%, #0b706d 58%, #031b23 100%);
+      box-shadow: 0 0 18px rgba(99, 245, 223, 0.55);
+    }
+    .logo-orbit::after {
+      content: '';
+      position: absolute;
+      inset: -1px;
+      border-radius: 50%;
+      border: 1px solid transparent;
+      border-top-color: rgba(246, 184, 107, 0.9);
+      border-right-color: rgba(99, 245, 223, 0.5);
+      animation: orbitSpin 7s linear infinite;
+    }
+    .brand-kicker {
+      margin: 0 0 5px;
+      font-size: 9px;
+      line-height: 1;
+      letter-spacing: 0.24em;
+      color: rgba(184, 255, 245, 0.62);
+      text-transform: uppercase;
+    }
+    .brand-title {
+      margin: 0;
+      font-family: 'Space Grotesk', 'Noto Sans TC', sans-serif;
+      font-size: clamp(23px, 2.7vw, 38px);
+      font-weight: 600;
+      line-height: 1.06;
+      letter-spacing: -0.035em;
+      text-shadow: 0 0 34px rgba(41, 215, 195, 0.14);
+    }
+    .brand-title .accent {
+      color: var(--cyan);
+      font-weight: 300;
+      letter-spacing: 0.02em;
+    }
+    .brand-sub {
+      margin: 7px 0 0;
+      font-size: 9px;
+      letter-spacing: 0.21em;
+      color: rgba(200, 235, 232, 0.48);
+      text-transform: uppercase;
+    }
+
+    .top-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
+    .live-strip {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 6px 10px;
+      border: 1px solid rgba(120, 238, 222, 0.11);
+      border-radius: 3px;
+      background: rgba(3, 12, 18, 0.4);
+      backdrop-filter: blur(10px);
+      font-size: 9px;
+      letter-spacing: 0.15em;
+      color: rgba(199, 240, 235, 0.56);
+    }
+    .status-dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--cyan);
+      box-shadow: 0 0 9px var(--cyan);
+      animation: softPulse 2s ease-in-out infinite;
+    }
+    .action-row { display: flex; align-items: center; gap: 8px; }
+
+    .ctrl-btn {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 9px;
+      height: 42px;
+      padding: 0 15px;
+      border: 1px solid rgba(129, 245, 228, 0.18);
+      border-radius: 7px;
+      background: linear-gradient(145deg, rgba(10, 28, 36, 0.78), rgba(4, 13, 19, 0.62));
+      backdrop-filter: blur(18px) saturate(130%);
+      -webkit-backdrop-filter: blur(18px) saturate(130%);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 12px 32px rgba(0, 0, 0, 0.22);
+      color: rgba(226, 252, 247, 0.86);
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.07em;
+      cursor: pointer;
+      transition: border-color 0.25s ease, background 0.25s ease, color 0.25s ease, transform 0.25s ease, box-shadow 0.25s ease;
+      white-space: nowrap;
+      user-select: none;
+    }
+    .ctrl-btn:hover {
+      border-color: rgba(129, 245, 228, 0.45);
+      background: linear-gradient(145deg, rgba(17, 47, 55, 0.86), rgba(5, 17, 24, 0.76));
+      color: #fff;
+      box-shadow: 0 0 26px rgba(55, 225, 203, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    }
+    .ctrl-btn:active { transform: translateY(1px); }
+    .ctrl-btn.primary {
+      border-color: rgba(99, 245, 223, 0.36);
+      background: linear-gradient(145deg, rgba(22, 79, 78, 0.72), rgba(5, 25, 31, 0.8));
+      color: #e7fffa;
+    }
+    .ctrl-btn.primary:hover { background: linear-gradient(145deg, rgba(30, 111, 105, 0.82), rgba(6, 33, 39, 0.9)); }
+    .ctrl-btn.active {
+      border-color: rgba(246, 184, 107, 0.55);
+      color: #ffe0b2;
+      box-shadow: 0 0 24px rgba(246, 184, 107, 0.12);
+    }
+    .ctrl-btn.icon-only { width: 42px; padding: 0; }
+    .ctrl-btn svg { width: 15px; height: 15px; flex: 0 0 auto; }
+
+    .glass {
+      background: linear-gradient(145deg, rgba(9, 26, 34, 0.82), rgba(3, 11, 16, 0.7));
+      border: 1px solid rgba(129, 245, 228, 0.14);
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.055);
+      backdrop-filter: blur(22px) saturate(128%);
+      -webkit-backdrop-filter: blur(22px) saturate(128%);
+    }
+
+    .spot-dock {
+      left: 22px;
+      bottom: 22px;
+      width: 258px;
+      display: none;
+    }
+    .dock-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 13px 14px 11px;
+      border-bottom: 1px solid rgba(120, 238, 222, 0.1);
+    }
+    .dock-head-title {
+      font-size: 9px;
+      letter-spacing: 0.2em;
+      color: rgba(196, 249, 241, 0.66);
+    }
+    .dock-count { font-size: 9px; letter-spacing: 0.1em; color: var(--amber); }
+    .spot-list { padding: 5px 7px 8px; }
+    .spot-row {
+      width: 100%;
+      display: grid;
+      grid-template-columns: 27px minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 7px;
+      border: 0;
+      border-bottom: 1px solid rgba(120, 238, 222, 0.055);
+      background: transparent;
+      text-align: left;
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+    .spot-row:last-child { border-bottom: 0; }
+    .spot-row:hover { background: rgba(99, 245, 223, 0.055); }
+    .spot-index { font-size: 8px; color: rgba(157, 211, 206, 0.38); letter-spacing: 0.06em; }
+    .spot-name { min-width: 0; }
+    .spot-name strong { display: block; font-size: 12px; font-weight: 500; color: rgba(233, 255, 251, 0.88); letter-spacing: 0.03em; }
+    .spot-name small { display: block; margin-top: 2px; font-size: 8px; letter-spacing: 0.13em; color: rgba(163, 205, 201, 0.38); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .spot-pin-dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--cyan);
+      box-shadow: 0 0 8px rgba(99, 245, 223, 0.9);
+    }
+    .spot-row[data-custom="true"] .spot-pin-dot { background: var(--amber); box-shadow: 0 0 8px rgba(246, 184, 107, 0.9); }
+    .dock-foot {
+      padding: 9px 14px 11px;
+      border-top: 1px solid rgba(120, 238, 222, 0.08);
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      font-size: 8px;
+      letter-spacing: 0.12em;
+      color: rgba(172, 219, 213, 0.36);
+    }
+
+    .coord-hud {
+      right: 22px;
+      bottom: 22px;
+      display: flex;
+      align-items: flex-end;
+      gap: 15px;
+      pointer-events: none;
+    }
+    .coord-readout {
+      text-align: right;
+      padding-bottom: 3px;
+      color: rgba(164, 221, 214, 0.48);
+      font-size: 8px;
+      line-height: 1.8;
+      letter-spacing: 0.12em;
+    }
+    .coord-readout strong { display: block; color: rgba(214, 255, 249, 0.72); font-size: 9px; font-weight: 400; }
+    .compass {
+      width: 58px;
+      height: 58px;
+      border-radius: 50%;
+      position: relative;
+      border: 1px solid rgba(129, 245, 228, 0.18);
+      background: radial-gradient(circle, rgba(17, 55, 59, 0.34), rgba(3, 12, 17, 0.6));
+      box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.45);
+    }
+    .compass::before {
+      content: '';
+      position: absolute;
+      inset: 8px;
+      border-radius: 50%;
+      border: 1px dashed rgba(129, 245, 228, 0.14);
+    }
+    .compass-needle {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 1px;
+      height: 20px;
+      margin-left: -0.5px;
+      margin-top: -20px;
+      transform-origin: 50% 100%;
+      background: linear-gradient(to top, transparent, rgba(246, 184, 107, 0.9));
+      transition: transform 0.12s linear;
+    }
+    .compass-needle::after {
+      content: '';
+      position: absolute;
+      top: -3px;
+      left: -2px;
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--amber);
+      box-shadow: 0 0 10px rgba(246, 184, 107, 0.8);
+    }
+    .compass-n {
+      position: absolute;
+      top: 5px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 7px;
+      color: rgba(224, 255, 250, 0.62);
+      letter-spacing: 0.08em;
+    }
+    .interaction-hint {
+      position: fixed;
+      left: 50%;
+      bottom: 18px;
+      transform: translateX(-50%);
+      z-index: 25;
+      display: none;
+      align-items: center;
+      gap: 13px;
+      font-size: 8px;
+      letter-spacing: 0.13em;
+      color: rgba(169, 216, 210, 0.36);
+      pointer-events: none;
+      white-space: nowrap;
+    }
+    .interaction-hint span { display: inline-flex; align-items: center; gap: 6px; }
+    .interaction-hint i { width: 3px; height: 3px; border-radius: 50%; background: rgba(99, 245, 223, 0.5); }
+
+    #pinTooltip {
+      position: fixed;
+      left: 0;
+      top: 0;
+      z-index: 42;
+      opacity: 0;
+      pointer-events: none;
+      transform: translate(-50%, -115%);
+      transition: opacity 0.16s ease;
+      will-change: left, top;
+    }
+    #pinTooltip.visible { opacity: 1; }
+    .tooltip-card {
+      position: relative;
+      min-width: 150px;
+      padding: 9px 12px 10px;
+      border: 1px solid rgba(133, 255, 236, 0.3);
+      border-radius: 6px;
+      background: linear-gradient(145deg, rgba(7, 26, 33, 0.92), rgba(2, 11, 16, 0.88));
+      box-shadow: 0 12px 35px rgba(0, 0, 0, 0.55), 0 0 25px rgba(53, 225, 203, 0.08);
+      backdrop-filter: blur(15px);
+    }
+    .tooltip-card::after {
+      content: '';
+      position: absolute;
+      bottom: -5px;
+      left: 50%;
+      width: 8px;
+      height: 8px;
+      border-right: 1px solid rgba(133, 255, 236, 0.3);
+      border-bottom: 1px solid rgba(133, 255, 236, 0.3);
+      background: rgba(4, 15, 21, 0.92);
+      transform: translateX(-50%) rotate(45deg);
+    }
+    .tooltip-name { display: block; font-size: 12px; font-weight: 500; letter-spacing: 0.03em; color: #effffb; }
+    .tooltip-meta { display: block; margin-top: 4px; font-size: 8px; letter-spacing: 0.13em; color: rgba(135, 226, 215, 0.66); }
+    .tooltip-coord { display: block; margin-top: 5px; font-size: 7px; letter-spacing: 0.08em; color: rgba(176, 210, 206, 0.37); }
+
+    #addBanner {
+      position: fixed;
+      left: 50%;
+      top: 108px;
+      z-index: 45;
+      transform: translate(-50%, -12px);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.28s ease, transform 0.28s ease;
+    }
+    #addBanner.active { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+    .banner-inner {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 9px 12px 9px 14px;
+      border: 1px solid rgba(246, 184, 107, 0.36);
+      border-radius: 7px;
+      background: rgba(17, 18, 17, 0.72);
+      backdrop-filter: blur(18px);
+      box-shadow: 0 14px 50px rgba(0, 0, 0, 0.45), 0 0 28px rgba(246, 184, 107, 0.07);
+    }
+    .banner-pulse { width: 7px; height: 7px; border-radius: 50%; background: var(--amber); box-shadow: 0 0 14px var(--amber); animation: softPulse 1.5s infinite; }
+    .banner-text { font-size: 11px; letter-spacing: 0.06em; color: #f8e4c9; white-space: nowrap; }
+    .banner-text small { display: block; margin-top: 2px; font-size: 8px; letter-spacing: 0.12em; color: rgba(246, 184, 107, 0.5); }
+    .banner-cancel { border: 0; background: transparent; padding: 5px; color: rgba(255, 229, 197, 0.58); font-size: 16px; line-height: 1; cursor: pointer; }
+    .banner-cancel:hover { color: #fff; }
+
+    body.adding #scene { cursor: crosshair; }
+    body.adding .interaction-hint { opacity: 0; }
+
+    .info-panel {
+      position: fixed;
+      top: 22px;
+      right: 22px;
+      bottom: 22px;
+      z-index: 50;
+      width: min(424px, calc(100vw - 34px));
+      opacity: 0;
+      transform: translateX(calc(100% + 44px));
+      transition: transform 0.72s cubic-bezier(0.19, 1, 0.22, 1), opacity 0.45s ease;
+      pointer-events: none;
+    }
+    .info-panel.open { opacity: 1; transform: translateX(0); pointer-events: auto; }
+    .panel-shell {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      border-radius: 18px;
+    }
+    .panel-head {
+      flex: 0 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 14px;
+      border-bottom: 1px solid rgba(120, 238, 222, 0.09);
+      background: rgba(3, 12, 18, 0.35);
+    }
+    .panel-head-left { display: flex; align-items: center; gap: 8px; }
+    .panel-head-title { font-size: 8px; letter-spacing: 0.2em; color: rgba(185, 235, 229, 0.55); }
+    .panel-code { font-size: 8px; letter-spacing: 0.13em; color: rgba(246, 184, 107, 0.72); }
+    .panel-close {
+      width: 28px;
+      height: 28px;
+      display: grid;
+      place-items: center;
+      border: 1px solid rgba(120, 238, 222, 0.12);
+      border-radius: 5px;
+      background: rgba(255, 255, 255, 0.025);
+      color: rgba(218, 251, 246, 0.65);
+      cursor: pointer;
+      transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
+    }
+    .panel-close:hover { border-color: rgba(120, 238, 222, 0.36); color: #fff; background: rgba(99, 245, 223, 0.08); }
+    .panel-scroll {
+      min-height: 0;
+      overflow-y: auto;
+      overflow-x: hidden;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(99, 245, 223, 0.25) transparent;
+    }
+    .panel-scroll::-webkit-scrollbar { width: 5px; }
+    .panel-scroll::-webkit-scrollbar-track { background: transparent; }
+    .panel-scroll::-webkit-scrollbar-thumb { background: rgba(99, 245, 223, 0.22); border-radius: 4px; }
+
+    .photo-shell {
+      position: relative;
+      height: 238px;
+      flex: 0 0 auto;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 65% 30%, rgba(246, 184, 107, 0.16), transparent 34%),
+        linear-gradient(145deg, #07151f, #02080e);
+    }
+    .photo-shell img {
+      width: 100%;
+      height: 100%;
+      display: block;
+      object-fit: cover;
+      opacity: 0.94;
+      transform: scale(1.055);
+      transition: transform 5.5s cubic-bezier(0.19, 1, 0.22, 1), opacity 0.5s ease;
+    }
+    .info-panel.open .photo-shell img { transform: scale(1); opacity: 1; }
+    .photo-shell::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background:
+        linear-gradient(to bottom, rgba(2, 7, 11, 0.42) 0%, transparent 28%, transparent 62%, rgba(2, 8, 12, 0.86) 100%),
+        repeating-linear-gradient(to right, rgba(255, 255, 255, 0.025) 0, rgba(255, 255, 255, 0.025) 1px, transparent 1px, transparent 33.333%);
+    }
+    .vf-corner { position: absolute; z-index: 2; width: 18px; height: 18px; border-color: rgba(218, 255, 249, 0.56); border-style: solid; }
+    .vf-corner.tl { top: 15px; left: 15px; border-width: 1px 0 0 1px; }
+    .vf-corner.tr { top: 15px; right: 15px; border-width: 1px 1px 0 0; }
+    .vf-corner.bl { bottom: 15px; left: 15px; border-width: 0 0 1px 1px; }
+    .vf-corner.br { bottom: 15px; right: 15px; border-width: 0 1px 1px 0; }
+    .photo-topline {
+      position: absolute;
+      z-index: 3;
+      top: 15px;
+      left: 45px;
+      right: 45px;
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      font-size: 7px;
+      letter-spacing: 0.16em;
+      color: rgba(231, 255, 251, 0.72);
+      text-shadow: 0 1px 8px rgba(0, 0, 0, 0.8);
+    }
+    .photo-caption {
+      position: absolute;
+      z-index: 3;
+      bottom: 17px;
+      left: 20px;
+      right: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 10px;
+      font-size: 8px;
+      letter-spacing: 0.12em;
+      color: rgba(215, 255, 249, 0.68);
+    }
+    .photo-caption strong { display: block; font-family: 'Space Grotesk', sans-serif; font-size: 17px; font-weight: 500; line-height: 1; color: #fff; letter-spacing: 0.01em; }
+    .photo-caption small { display: block; margin-top: 4px; font-family: 'JetBrains Mono', monospace; font-size: 7px; letter-spacing: 0.12em; color: rgba(163, 218, 211, 0.54); }
+    .gps-chip {
+      padding: 4px 6px;
+      border: 1px solid rgba(163, 255, 240, 0.2);
+      border-radius: 3px;
+      background: rgba(0, 10, 14, 0.4);
+      white-space: nowrap;
+    }
+
+    .panel-body { padding: 18px 18px 20px; }
+    .eyebrow-row { display: flex; align-items: center; gap: 8px; font-size: 8px; letter-spacing: 0.16em; color: rgba(118, 229, 216, 0.66); text-transform: uppercase; }
+    .eyebrow-row .dot { width: 3px; height: 3px; border-radius: 50%; background: rgba(246, 184, 107, 0.76); }
+    .panel-title {
+      margin: 8px 0 3px;
+      font-family: 'Space Grotesk', 'Noto Sans TC', sans-serif;
+      font-size: 27px;
+      line-height: 1.1;
+      letter-spacing: -0.03em;
+      font-weight: 500;
+      color: #f4fffc;
+    }
+    .panel-subtitle { margin: 0; font-size: 8px; letter-spacing: 0.2em; color: rgba(155, 209, 203, 0.42); }
+    .section-label {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin: 18px 0 8px;
+      font-size: 8px;
+      letter-spacing: 0.17em;
+      color: rgba(188, 235, 229, 0.48);
+    }
+    .section-label::after { content: ''; flex: 1; height: 1px; margin-left: 12px; background: linear-gradient(90deg, rgba(120, 238, 222, 0.18), transparent); }
+    .camera-card {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 9px 11px;
+      border: 1px solid rgba(120, 238, 222, 0.1);
+      border-radius: 5px;
+      background: rgba(3, 13, 18, 0.42);
+    }
+    .camera-card .camera-label { font-size: 7px; letter-spacing: 0.14em; color: rgba(157, 213, 206, 0.4); }
+    .camera-card .camera-name { margin-top: 2px; font-family: 'JetBrains Mono', monospace; font-size: 10px; color: rgba(230, 255, 250, 0.9); }
+    .camera-card .lens-name { max-width: 45%; font-size: 8px; text-align: right; color: rgba(152, 209, 202, 0.52); }
+    .exif-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 6px;
+      margin-top: 6px;
+    }
+    .exif-badge {
+      min-width: 0;
+      padding: 8px 7px 7px;
+      border: 1px solid rgba(120, 238, 222, 0.09);
+      border-radius: 4px;
+      background: rgba(2, 10, 14, 0.42);
+    }
+    .exif-badge span { display: block; font-size: 6px; letter-spacing: 0.13em; color: rgba(155, 210, 204, 0.38); }
+    .exif-badge strong {
+      display: block;
+      margin-top: 4px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      line-height: 1.2;
+      font-weight: 400;
+      color: rgba(245, 255, 253, 0.94);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .exif-badge:nth-child(2) strong { color: var(--amber); }
+    .exif-badge:nth-child(4) strong { color: var(--cyan); }
+
+    .observation-card {
+      margin-top: 13px;
+      padding: 12px;
+      border: 1px solid rgba(120, 238, 222, 0.11);
+      border-radius: 7px;
+      background:
+        radial-gradient(circle at 12% 24%, rgba(99, 245, 223, 0.075), transparent 36%),
+        linear-gradient(145deg, rgba(7, 25, 31, 0.62), rgba(2, 9, 14, 0.54));
+    }
+    .obs-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .obs-title { font-size: 8px; letter-spacing: 0.18em; color: rgba(182, 242, 234, 0.68); }
+    .obs-live { display: inline-flex; align-items: center; gap: 5px; font-size: 6px; letter-spacing: 0.14em; color: rgba(142, 226, 215, 0.45); }
+    .obs-main { display: flex; align-items: center; gap: 16px; margin-top: 12px; }
+    .score-ring {
+      --score-angle: 300deg;
+      --score-color: var(--cyan);
+      flex: 0 0 auto;
+      position: relative;
+      width: 78px;
+      height: 78px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      background: conic-gradient(from 210deg, var(--score-color) 0deg, var(--score-color) var(--score-angle), rgba(255, 255, 255, 0.07) var(--score-angle), rgba(255, 255, 255, 0.07) 360deg);
+      box-shadow: 0 0 24px rgba(99, 245, 223, 0.07);
+    }
+    .score-ring::before { content: ''; position: absolute; inset: 5px; border-radius: 50%; background: #07151b; border: 1px solid rgba(120, 238, 222, 0.1); }
+    .score-inner { position: relative; z-index: 1; display: flex; align-items: baseline; gap: 2px; }
+    .score-inner strong { font-family: 'Space Grotesk', sans-serif; font-size: 25px; font-weight: 500; line-height: 1; color: #f2fffd; }
+    .score-inner span { font-size: 7px; color: rgba(167, 221, 214, 0.45); }
+    .obs-metrics { flex: 1; min-width: 0; }
+    .metric-row { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
+    .metric-row:last-child { margin-bottom: 0; }
+    .metric-label { width: 44px; flex: 0 0 auto; font-size: 7px; letter-spacing: 0.08em; color: rgba(166, 213, 208, 0.44); }
+    .metric-value { min-width: 43px; text-align: right; font-family: 'JetBrains Mono', monospace; font-size: 8px; color: rgba(231, 255, 251, 0.78); }
+    .metric-bar { flex: 1; height: 3px; border-radius: 3px; overflow: hidden; background: rgba(255, 255, 255, 0.07); }
+    .metric-bar i { display: block; height: 100%; width: 50%; border-radius: inherit; background: linear-gradient(90deg, rgba(99, 245, 223, 0.45), var(--cyan)); box-shadow: 0 0 8px rgba(99, 245, 223, 0.4); transition: width 0.8s ease; }
+    .bortle-scale { display: flex; flex: 1; gap: 2px; }
+    .bortle-scale i { flex: 1; height: 4px; border-radius: 1px; background: rgba(255, 255, 255, 0.07); }
+    .bortle-scale i.on { background: var(--amber); box-shadow: 0 0 6px rgba(246, 184, 107, 0.38); }
+    .obs-foot { display: flex; justify-content: space-between; gap: 8px; margin-top: 10px; padding-top: 9px; border-top: 1px solid rgba(120, 238, 222, 0.08); font-size: 7px; letter-spacing: 0.08em; color: rgba(155, 208, 202, 0.45); }
+    .obs-foot strong { color: rgba(246, 184, 107, 0.8); font-weight: 400; }
+
+    .story-card {
+      margin-top: 13px;
+      padding: 11px 12px;
+      border-left: 1px solid rgba(246, 184, 107, 0.28);
+      background: linear-gradient(90deg, rgba(246, 184, 107, 0.035), transparent);
+      font-size: 10px;
+      line-height: 1.8;
+      color: rgba(195, 227, 222, 0.6);
+    }
+    .photo-gps-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      margin-top: 11px;
+      padding: 8px 2px;
+      border-top: 1px solid rgba(120, 238, 222, 0.08);
+      font-size: 7px;
+      letter-spacing: 0.1em;
+      color: rgba(153, 209, 202, 0.44);
+    }
+    .photo-gps-row strong { font-family: 'JetBrains Mono', monospace; font-weight: 400; color: rgba(206, 248, 242, 0.68); }
+    .delete-spot-btn {
+      width: 100%;
+      margin-top: 14px;
+      padding: 9px;
+      border: 1px solid rgba(246, 184, 107, 0.16);
+      border-radius: 5px;
+      background: rgba(246, 184, 107, 0.035);
+      color: rgba(246, 184, 107, 0.62);
+      font-size: 8px;
+      letter-spacing: 0.12em;
+      cursor: pointer;
+      transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+    }
+    .delete-spot-btn:hover { border-color: rgba(246, 184, 107, 0.38); background: rgba(246, 184, 107, 0.08); color: #ffd9a7; }
+
+    .modal {
+      position: fixed;
+      inset: 0;
+      z-index: 80;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      background: rgba(0, 4, 7, 0.68);
+      backdrop-filter: blur(9px);
+      -webkit-backdrop-filter: blur(9px);
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.3s ease, visibility 0.3s ease;
+    }
+    .modal.active { opacity: 1; visibility: visible; }
+    .modal-card {
+      width: min(540px, 100%);
+      max-height: calc(100dvh - 32px);
+      overflow-y: auto;
+      border-radius: 18px;
+      padding: 22px;
+      transform: translateY(14px) scale(0.985);
+      transition: transform 0.35s cubic-bezier(0.19, 1, 0.22, 1);
+      scrollbar-width: thin;
+      scrollbar-color: rgba(99, 245, 223, 0.25) transparent;
+    }
+    .modal.active .modal-card { transform: translateY(0) scale(1); }
+    .modal-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+    .modal-kicker { font-size: 8px; letter-spacing: 0.2em; color: rgba(126, 231, 218, 0.6); }
+    .modal-title { margin: 6px 0 0; font-family: 'Space Grotesk', 'Noto Sans TC', sans-serif; font-size: 25px; font-weight: 500; letter-spacing: -0.02em; }
+    .modal-close {
+      width: 30px;
+      height: 30px;
+      flex: 0 0 auto;
+      display: grid;
+      place-items: center;
+      border: 1px solid rgba(120, 238, 222, 0.13);
+      border-radius: 5px;
+      background: rgba(255, 255, 255, 0.025);
+      color: rgba(223, 255, 250, 0.65);
+      cursor: pointer;
+    }
+    .modal-close:hover { border-color: rgba(120, 238, 222, 0.38); color: #fff; }
+    .location-readout {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      margin-top: 18px;
+      padding: 10px 12px;
+      border: 1px solid rgba(120, 238, 222, 0.11);
+      border-radius: 6px;
+      background: rgba(2, 11, 16, 0.38);
+    }
+    .location-icon {
+      width: 28px;
+      height: 28px;
+      flex: 0 0 auto;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      border: 1px solid rgba(246, 184, 107, 0.25);
+      color: var(--amber);
+      background: rgba(246, 184, 107, 0.05);
+    }
+    .location-readout .loc-label { font-size: 7px; letter-spacing: 0.14em; color: rgba(157, 210, 204, 0.4); }
+    .location-readout .loc-value { margin-top: 2px; font-family: 'JetBrains Mono', monospace; font-size: 10px; color: rgba(235, 255, 251, 0.86); }
+    .location-readout .loc-district { margin-left: auto; font-size: 8px; letter-spacing: 0.1em; color: rgba(246, 184, 107, 0.72); white-space: nowrap; }
+
+    .field-label { display: block; margin: 16px 0 6px; font-size: 8px; letter-spacing: 0.15em; color: rgba(170, 219, 213, 0.52); }
+    .text-input {
+      width: 100%;
+      height: 40px;
+      padding: 0 12px;
+      border: 1px solid rgba(120, 238, 222, 0.14);
+      border-radius: 5px;
+      background: rgba(2, 10, 14, 0.5);
+      color: #eafffb;
+      font-size: 12px;
+      letter-spacing: 0.03em;
+      outline: none;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+    .text-input:focus { border-color: rgba(99, 245, 223, 0.44); box-shadow: 0 0 0 3px rgba(99, 245, 223, 0.06); }
+    .dropzone {
+      position: relative;
+      min-height: 138px;
+      margin-top: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      border: 1px dashed rgba(120, 238, 222, 0.26);
+      border-radius: 8px;
+      background:
+        radial-gradient(circle at 50% 50%, rgba(99, 245, 223, 0.05), transparent 58%),
+        rgba(2, 10, 14, 0.34);
+      cursor: pointer;
+      transition: border-color 0.2s ease, background 0.2s ease;
+    }
+    .dropzone:hover, .dropzone.dragover { border-color: rgba(99, 245, 223, 0.55); background-color: rgba(99, 245, 223, 0.055); }
+    .drop-prompt { display: flex; flex-direction: column; align-items: center; gap: 7px; padding: 18px; text-align: center; }
+    .drop-icon {
+      width: 38px;
+      height: 38px;
+      display: grid;
+      place-items: center;
+      border: 1px solid rgba(99, 245, 223, 0.2);
+      border-radius: 50%;
+      color: rgba(126, 245, 228, 0.8);
+      background: rgba(99, 245, 223, 0.045);
+    }
+    .drop-prompt strong { font-size: 11px; font-weight: 400; letter-spacing: 0.05em; color: rgba(231, 255, 251, 0.85); }
+    .drop-prompt small { font-size: 7px; letter-spacing: 0.1em; color: rgba(156, 207, 202, 0.42); }
+    .modal-preview {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      opacity: 0.9;
+      pointer-events: none;
+    }
+    .preview-shade { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(to top, rgba(2, 8, 12, 0.7), transparent 50%); }
+    .preview-badge { position: absolute; left: 10px; bottom: 9px; z-index: 2; padding: 4px 6px; border: 1px solid rgba(163, 255, 240, 0.2); border-radius: 3px; background: rgba(0, 10, 14, 0.45); font-size: 7px; letter-spacing: 0.1em; color: rgba(220, 255, 250, 0.7); }
+    .exif-status { min-height: 16px; margin-top: 8px; font-size: 8px; letter-spacing: 0.08em; color: rgba(154, 207, 201, 0.48); }
+    .exif-status.ok { color: rgba(99, 245, 223, 0.7); }
+    .exif-status.warn { color: rgba(246, 184, 107, 0.72); }
+    .modal-exif-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 3px; }
+    .modal-exif-chip { padding: 4px 6px; border: 1px solid rgba(120, 238, 222, 0.12); border-radius: 3px; background: rgba(2, 10, 14, 0.35); font-family: 'JetBrains Mono', monospace; font-size: 7px; color: rgba(209, 250, 244, 0.65); }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+    .modal-note { margin: 12px 0 0; font-size: 7px; line-height: 1.7; letter-spacing: 0.07em; color: rgba(147, 199, 194, 0.34); }
+
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 30px;
+      z-index: 90;
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 9px 14px;
+      border: 1px solid rgba(120, 238, 222, 0.24);
+      border-radius: 6px;
+      background: rgba(4, 16, 21, 0.88);
+      box-shadow: 0 18px 50px rgba(0, 0, 0, 0.5), 0 0 22px rgba(52, 225, 204, 0.06);
+      backdrop-filter: blur(18px);
+      font-size: 10px;
+      letter-spacing: 0.04em;
+      color: rgba(226, 255, 250, 0.88);
+      opacity: 0;
+      transform: translate(-50%, 10px);
+      pointer-events: none;
+      transition: opacity 0.28s ease, transform 0.28s ease;
+      white-space: nowrap;
+    }
+    .toast.show { opacity: 1; transform: translate(-50%, 0); }
+    .toast i { width: 5px; height: 5px; border-radius: 50%; background: var(--cyan); box-shadow: 0 0 9px var(--cyan); }
+
+    .loader {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      display: grid;
+      place-items: center;
+      background:
+        radial-gradient(circle at 50% 44%, rgba(23, 96, 93, 0.12), transparent 38%),
+        #02070b;
+      transition: opacity 0.8s ease, visibility 0.8s ease;
+    }
+    .loader.done { opacity: 0; visibility: hidden; pointer-events: none; }
+    .loader-inner { display: flex; flex-direction: column; align-items: center; }
+    .loader-orbit { width: 64px; height: 64px; position: relative; margin-bottom: 21px; }
+    .loader-orbit::before { content: ''; position: absolute; inset: 9px; border-radius: 50%; border: 1px solid rgba(99, 245, 223, 0.22); border-top-color: var(--cyan); animation: orbitSpin 1.3s linear infinite; }
+    .loader-orbit::after { content: ''; position: absolute; inset: 22px; border-radius: 50%; background: var(--cyan); box-shadow: 0 0 24px rgba(99, 245, 223, 0.7); animation: softPulse 1.4s ease-in-out infinite; }
+    .loader-title { font-family: 'Space Grotesk', 'Noto Sans TC', sans-serif; font-size: 16px; letter-spacing: 0.15em; color: rgba(230, 255, 251, 0.88); }
+    .loader-sub { margin-top: 7px; font-size: 7px; letter-spacing: 0.24em; color: rgba(141, 206, 198, 0.4); }
+    .loader-bar { width: 180px; height: 1px; margin-top: 20px; background: rgba(255, 255, 255, 0.07); overflow: hidden; }
+    .loader-bar i { display: block; width: 0; height: 100%; background: linear-gradient(90deg, transparent, var(--cyan), var(--amber)); animation: loadingBar 2.2s ease-in-out forwards; }
+
+    @keyframes nebulaShift {
+      0% { transform: translate3d(-2%, -1%, 0) scale(1.02); }
+      100% { transform: translate3d(3%, 2%, 0) scale(1.08); }
+    }
+    @keyframes orbitSpin { to { transform: rotate(360deg); } }
+    @keyframes softPulse {
+      0%, 100% { opacity: 0.55; transform: scale(0.92); }
+      50% { opacity: 1; transform: scale(1.08); }
+    }
+    @keyframes loadingBar { 0% { width: 0; } 55% { width: 72%; } 100% { width: 100%; } }
+    @keyframes meteorFall {
+      0%, 91% { opacity: 0; transform: translate3d(0, 0, 0) rotate(-26deg); }
+      92% { opacity: 1; }
+      97% { opacity: 0; transform: translate3d(-280px, 130px, 0) rotate(-26deg); }
+      100% { opacity: 0; transform: translate3d(-280px, 130px, 0) rotate(-26deg); }
+    }
+
+    @media (min-width: 1000px) {
+      .spot-dock { display: block; }
+      .interaction-hint { display: flex; }
+    }
+    @media (max-width: 767px) {
+      .ui-header { padding: 14px; }
+      .brand { gap: 10px; }
+      .logo-orbit { width: 38px; height: 38px; }
+      .logo-orbit::before { inset: 10px; }
+      .brand-kicker { font-size: 7px; letter-spacing: 0.18em; }
+      .brand-title { font-size: 23px; }
+      .brand-sub { font-size: 7px; letter-spacing: 0.14em; }
+      .live-strip { display: none; }
+      .ctrl-btn { height: 38px; padding: 0 11px; font-size: 10px; }
+      .ctrl-btn.icon-only { width: 38px; }
+      .ctrl-btn .btn-label { display: none; }
+      .top-actions { gap: 7px; }
+      .info-panel {
+        left: 10px;
+        right: 10px;
+        bottom: 10px;
+        top: auto;
+        width: auto;
+        height: min(77dvh, 690px);
+        transform: translateY(calc(100% + 26px));
+      }
+      .info-panel.open { transform: translateY(0); }
+      .panel-shell { border-radius: 16px; }
+      .photo-shell { height: 205px; }
+      .coord-hud { display: none; }
+      .screen-corners { inset: 8px; }
+      .modal-card { padding: 18px; border-radius: 15px; }
+      .toast { bottom: 20px; max-width: calc(100vw - 24px); white-space: normal; text-align: center; }
+      .meteor { left: 60%; }
+      .interaction-hint { display: none; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        scroll-behavior: auto !important;
+      }
+    }
+  </style>
+  </style>
+</head>
+<body>
+  <div class="nebula"></div>
+  <div class="nebula second"></div>
+  <div class="meteor"></div>
+  <div class="meteor two"></div>
+  <canvas id="scene"></canvas>
+  <div class="grain"></div>
+  <div class="scanlines"></div>
+  <div class="vignette"></div>
+  <div class="screen-corners"><i></i><i></i><i></i><i></i></div>
+
+  <header class="ui ui-header">
+    <div class="brand">
+      <div class="logo-orbit" aria-hidden="true"></div>
+      <div>
+        <p class="brand-kicker mono">KINMEN / 24.44°N 118.34°E / DARK SKY ATLAS</p>
+        <h1 class="brand-title">暗空與光影足跡 <span class="accent">3D</span></h1>
+        <p class="brand-sub mono">Kinmen Light-Trace Observatory · Interactive Terrain Map</p>
+      </div>
+    </div>
+
+    <div class="top-actions">
+      <div class="live-strip mono">
+        <span class="status-dot"></span>
+        <span>SIMULATION LIVE</span>
+        <span id="clockReadout">2026.11.06 · 00:00:00</span>
+      </div>
+      <div class="action-row">
+        <button id="addTrailBtn" class="ctrl-btn primary" type="button" aria-label="新增光影足跡">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+          <span class="btn-label">新增光影足跡</span>
+        </button>
+        <button id="resetViewBtn" class="ctrl-btn icon-only" type="button" aria-label="重置為鳥瞰視角" title="重置視角">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <div id="addBanner" aria-live="polite">
+    <div class="banner-inner">
+      <span class="banner-pulse"></span>
+      <span class="banner-text">足跡模式 · 點擊金門島嶼放置光點<small class="mono">CLICK TERRAIN TO DROP A LIGHT TRACE</small></span>
+      <button id="cancelAddMode" class="banner-cancel" type="button" aria-label="取消新增模式">&times;</button>
+    </div>
+  </div>
+
+  <div id="pinTooltip" role="status" aria-live="polite">
+    <div class="tooltip-card">
+      <span id="tipName" class="tooltip-name">昔果山海灘</span>
+      <span id="tipMeta" class="tooltip-meta mono">日出 / 飛機 · KM-01</span>
+      <span id="tipCoord" class="tooltip-coord mono">24.4270 N / 118.3503 E</span>
+    </div>
+  </div>
+
+  <aside class="ui spot-dock glass" aria-label="光影足跡快速導覽">
+    <div class="dock-head">
+      <span class="dock-head-title mono">LIGHT TRACE INDEX</span>
+      <span id="siteCount" class="dock-count mono">05 SITES</span>
+    </div>
+    <div id="spotList" class="spot-list"></div>
+    <div class="dock-foot mono">
+      <span>SELECT TO FLY</span>
+      <span id="customCount">00 CUSTOM</span>
+    </div>
+  </aside>
+
+  <div class="ui coord-hud">
+    <div class="coord-readout mono">
+      <strong id="coordReadout">24.4575° N / 118.3425° E</strong>
+      <span>TERRAIN CURSOR · WGS84</span>
+    </div>
+    <div class="compass" aria-hidden="true">
+      <span class="compass-n mono">N</span>
+      <div id="compassNeedle" class="compass-needle"></div>
+    </div>
+  </div>
+
+  <div class="interaction-hint mono">
+    <span><i></i> 左鍵旋轉</span>
+    <span><i></i> 右鍵平移</span>
+    <span><i></i> 滾輪縮放</span>
+  </div>
+
+  <aside id="infoPanel" class="info-panel" aria-hidden="true">
+    <div class="panel-shell glass">
+      <div class="panel-head">
+        <div class="panel-head-left">
+          <span class="status-dot"></span>
+          <span class="panel-head-title mono">LIGHT TRACE FILE</span>
+        </div>
+        <div class="panel-head-left">
+          <span id="panelCode" class="panel-code mono">KM-01</span>
+          <button id="closePanelBtn" class="panel-close" type="button" aria-label="關閉資訊面板">
+            <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="M1 1l10 10M11 1L1 11"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="panel-scroll">
+        <div class="photo-shell">
+          <img id="panelPhoto" alt="" />
+          <span class="vf-corner tl"></span><span class="vf-corner tr"></span>
+          <span class="vf-corner bl"></span><span class="vf-corner br"></span>
+          <div class="photo-topline mono">
+            <span id="panelTheme">DAWN PATROL</span>
+            <span id="panelGps" class="gps-chip">GPS 24.4270 / 118.3503</span>
+          </div>
+          <div class="photo-caption">
+            <div>
+              <strong id="panelPhotoTitle">昔果山海灘</strong>
+              <small id="panelPhotoMeta" class="mono">2026.03.18 · 05:42</small>
+            </div>
+            <span id="panelTime" class="mono">05:42:18</span>
+          </div>
+        </div>
+
+        <div class="panel-body">
+          <div class="eyebrow-row mono">
+            <span id="panelDistrict">金寧鄉</span>
+            <span class="dot"></span>
+            <span id="panelTag">日出 / 飛機</span>
+          </div>
+          <h2 id="panelTitle" class="panel-title">昔果山海灘</h2>
+          <p id="panelSubtitle" class="panel-subtitle mono">XIGUOSHAN BEACH</p>
+
+          <div class="section-label mono"><span>CAMERA EXIF / 拍攝參數</span><span id="panelShotMeta">FRAME 01</span></div>
+          <div class="camera-card">
+            <div>
+              <div class="camera-label mono">CAMERA BODY</div>
+              <div id="exifCamera" class="camera-name">SONY α7R V</div>
+            </div>
+            <div id="exifLens" class="lens-name">FE 24mm F1.4 GM</div>
+          </div>
+          <div class="exif-grid">
+            <div class="exif-badge"><span class="mono">FOCAL</span><strong id="exifFocal">24 mm</strong></div>
+            <div class="exif-badge"><span class="mono">APERTURE</span><strong id="exifAperture">F1.8</strong></div>
+            <div class="exif-badge"><span class="mono">SHUTTER</span><strong id="exifShutter">1/640 s</strong></div>
+            <div class="exif-badge"><span class="mono">SENSITIVITY</span><strong id="exifIso">ISO 100</strong></div>
+          </div>
+
+          <div class="observation-card">
+            <div class="obs-head">
+              <span class="obs-title mono">LIVE DARK-SKY INDEX / 即時暗空觀測</span>
+              <span class="obs-live mono"><span class="status-dot"></span>SIMULATED</span>
+            </div>
+            <div class="obs-main">
+              <div id="scoreRing" class="score-ring">
+                <div class="score-inner"><strong id="scoreValue">92</strong><span>/100</span></div>
+              </div>
+              <div class="obs-metrics">
+                <div class="metric-row">
+                  <span class="metric-label">雲量</span>
+                  <div class="metric-bar"><i id="cloudBar"></i></div>
+                  <span id="cloudValue" class="metric-value">12%</span>
+                </div>
+                <div class="metric-row">
+                  <span class="metric-label">BORTLE</span>
+                  <div id="bortleScale" class="bortle-scale"></div>
+                  <span id="bortleValue" class="metric-value">B3</span>
+                </div>
+                <div class="metric-row">
+                  <span class="metric-label">月相</span>
+                  <div class="metric-bar"><i id="moonBar"></i></div>
+                  <span id="moonValue" class="metric-value">62%</span>
+                </div>
+              </div>
+            </div>
+            <div class="obs-foot mono">
+              <span id="obsVerdict">觀星條件 · 極佳</span>
+              <span>UPDATED <strong id="obsUpdated">--:--</strong></span>
+            </div>
+          </div>
+
+          <div id="panelStory" class="story-card">在退潮後的長灘上等待第一道晨光，遠方飛機緩緩掠過天際。這裡是金門最具電影感的日出観測點之一。</div>
+
+          <div id="photoGpsWrap" class="photo-gps-row mono">
+            <span>PHOTO GPS / 照片定位</span>
+            <strong id="panelPhotoGps">—</strong>
+          </div>
+
+          <div class="photo-gps-row mono">
+            <span>OBSERVATION MODE</span>
+            <strong>SIMULATED / FRONTEND ONLY</strong>
+          </div>
+
+          <button id="deleteSpotBtn" class="delete-spot-btn mono" type="button">移除此自訂光影足跡</button>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <div id="addModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="addModalTitle" aria-hidden="true">
+    <div class="modal-card glass">
+      <div class="modal-head">
+        <div>
+          <div class="modal-kicker mono">NEW LIGHT TRACE / EXIF ENABLED</div>
+          <h3 id="addModalTitle" class="modal-title">新增光影足跡</h3>
+        </div>
+        <button id="closeModalBtn" class="modal-close" type="button" aria-label="關閉新增視窗">
+          <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="M1 1l10 10M11 1L1 11"/></svg>
+        </button>
+      </div>
+
+      <div class="location-readout">
+        <div class="location-icon">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="10" r="3"/><path d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11Z"/></svg>
+        </div>
+        <div>
+          <div class="loc-label mono">SELECTED COORDINATE</div>
+          <div id="modalCoords" class="loc-value">24.4270° N / 118.3503° E</div>
+        </div>
+        <span id="modalDistrict" class="loc-district">金寧鄉</span>
+      </div>
+
+      <label class="field-label mono" for="spotNameInput">LIGHT TRACE NAME / 足跡名稱</label>
+      <input id="spotNameInput" class="text-input" type="text" maxlength="32" placeholder="例如：慈湖夜色" autocomplete="off" />
+
+      <div id="dropZone" class="dropzone" tabindex="0" role="button" aria-label="拖拉或選擇照片上傳">
+        <input id="photoInput" type="file" accept="image/*" hidden />
+        <div id="dropPrompt" class="drop-prompt">
+          <div class="drop-icon">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M12 16V4m0 0L7 9m5-5 5 5"/><path d="M4 15v4h16v-4"/></svg>
+          </div>
+          <strong>拖曳照片到此，或點擊選擇</strong>
+          <small class="mono">JPG / PNG · EXIF & GPS AUTO READ · STORED LOCALLY</small>
+        </div>
+        <img id="modalPreview" class="modal-preview" alt="待上傳照片預覽" hidden />
+        <div id="previewShade" class="preview-shade" hidden></div>
+        <span id="previewBadge" class="preview-badge mono" hidden>PHOTO READY</span>
+      </div>
+
+      <div id="exifStatus" class="exif-status mono">等待照片，若無 EXIF 將自動套用夜拍預設參數。</div>
+      <div id="modalExifChips" class="modal-exif-chips"></div>
+
+      <div class="modal-actions">
+        <button id="modalCancelBtn" class="ctrl-btn" type="button">取消</button>
+        <button id="saveSpotBtn" class="ctrl-btn primary" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M5 12.5 10 17l9-10"/></svg>
+          <span>建立足跡</span>
+        </button>
+      </div>
+      <p class="modal-note mono">照片與座標僅儲存在此瀏覽器的 LocalStorage；清除網站資料後即會移除。GPS 若存在，將顯示於資訊面板。</p>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"><i></i><span id="toastText">已建立光影足跡</span></div>
+
+  <div id="loader" class="loader">
+    <div class="loader-inner">
+      <div class="loader-orbit"></div>
+      <div class="loader-title">KINMEN DARK SKY</div>
+      <div class="loader-sub mono">BUILDING TERRAIN · STARS · LIGHT TRACES</div>
+      <div class="loader-bar"><i></i></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    /* ------------------------------------------------------------------ */
+    /* DOM + constants                                                     */
+    /* ------------------------------------------------------------------ */
+    const $ = (selector) => document.querySelector(selector);
+    const $$ = (selector) => Array.from(document.querySelectorAll(selector));
+
+    const canvas = $('#scene');
+    const infoPanel = $('#infoPanel');
+    const addModal = $('#addModal');
+    const addBanner = $('#addBanner');
+    const addTrailBtn = $('#addTrailBtn');
+    const pinTooltip = $('#pinTooltip');
+    const toast = $('#toast');
+    const loader = $('#loader');
+    const dropZone = $('#dropZone');
+    const photoInput = $('#photoInput');
+    const spotNameInput = $('#spotNameInput');
+    const saveSpotBtn = $('#saveSpotBtn');
+    const exifStatus = $('#exifStatus');
+    const modalExifChips = $('#modalExifChips');
+
+    const STORAGE_KEY = 'kinmen_light_traces_v1';
+    const MAP_SCALE = 2.4;
+    const CENTER_LON = 118.3425;
+    const CENTER_LAT = 24.4575;
+    const LON_SCALE = 111.32 * Math.cos(CENTER_LAT * Math.PI / 180) * MAP_SCALE;
+    const LAT_SCALE = 111.32 * MAP_SCALE;
+    const TOWN_DEPTH = 2.2;
+    const TOWN_TOP = TOWN_DEPTH + 0.02;
+    const TERRAIN_BASE = TOWN_TOP - 0.06;
+    const DEFAULT_EXIF = {
+      camera: 'FUJIFILM X-T5',
+      lens: 'XF 23mm F2 R WR',
+      focal: '23 mm',
+      aperture: 'F2.0',
+      shutter: '1/125 s',
+      iso: 'ISO 3200'
+    };
+
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+    const pad2 = (value) => String(value).padStart(2, '0');
+
+    function hashCode(input) {
+      let hash = 2166136261;
+      for (let i = 0; i < input.length; i += 1) {
+        hash ^= input.charCodeAt(i);
+        hash = Math.imul(hash, 16777619);
+      }
+      return hash >>> 0;
+    }
+
+    function mulberry32(seed) {
+      let a = seed >>> 0;
+      return function random() {
+        a |= 0;
+        a = (a + 0x6d2b79f5) | 0;
+        let t = Math.imul(a ^ (a >>> 15), 1 | a);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+    }
+
+    function formatDate(date = new Date()) {
+      return `${date.getFullYear()}.${pad2(date.getMonth() + 1)}.${pad2(date.getDate())}`;
+    }
+
+    function formatTime(date = new Date()) {
+      return `${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
+    }
+
+    function formatTimeSeconds(date = new Date()) {
+      return `${pad2(date.getHours())}:${pad2(date.getMinutes())}:${pad2(date.getSeconds())}`;
+    }
+
+    function formatCoords(lat, lon) {
+      return `${Math.abs(lat).toFixed(4)}° ${lat >= 0 ? 'N' : 'S'} / ${Math.abs(lon).toFixed(4)}° ${lon >= 0 ? 'E' : 'W'}`;
+    }
+
+    function project(lon, lat) {
+      return [
+        (lon - CENTER_LON) * LON_SCALE,
+        -(lat - CENTER_LAT) * LAT_SCALE
+      ];
+    }
+
+    function unproject(x, z) {
+      return {
+        lon: CENTER_LON + x / LON_SCALE,
+        lat: CENTER_LAT - z / LAT_SCALE
+      };
+    }
+
+    function pointInRing(x, z, ring) {
+      let inside = false;
+      for (let i = 0, j = ring.length - 1; i < ring.length; j = i, i += 1) {
+        const xi = ring[i][0];
+        const zi = ring[i][1];
+        const xj = ring[j][0];
+        const zj = ring[j][1];
+        const intersects = ((zi > z) !== (zj > z)) && (x < ((xj - xi) * (z - zi)) / (zj - zi) + xi);
+        if (intersects) inside = !inside;
+      }
+      return inside;
+    }
+
+    function normalizeRing(coords) {
+      const ring = [];
+      coords.forEach((point) => {
+        if (!ring.length) {
+          ring.push(point);
+          return;
+        }
+        const previous = ring[ring.length - 1];
+        if (Math.abs(previous[0] - point[0]) > 0.0000001 || Math.abs(previous[1] - point[1]) > 0.0000001) {
+          ring.push(point);
+        }
+      });
+      if (ring.length > 2) {
+        const first = ring[0];
+        const last = ring[ring.length - 1];
+        if (Math.abs(first[0] - last[0]) < 0.0000001 && Math.abs(first[1] - last[1]) < 0.0000001) {
+          ring.pop();
+        }
+      }
+      return ring;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Kinmen township outlines (geoBoundaries ADM2, simplified)           */
+    /* ------------------------------------------------------------------ */
+    const TOWNS = [
+      {
+        id: 'jincheng', name: '金城', en: 'JINCHENG', tint: 0x0a2731,
+        coords: [
+          [118.30943,24.437453],[118.309282,24.43118],[118.30805,24.430833],[118.31112,24.42728],
+          [118.302154,24.424602],[118.286613,24.424764],[118.30112,24.42453],[118.298667,24.422262],
+          [118.302228,24.420706],[118.29784,24.4148],[118.29367,24.413456],[118.2906,24.414134],
+          [118.289323,24.421236],[118.289271,24.415906],[118.288282,24.417064],[118.286597,24.416009],
+          [118.286667,24.417039],[118.286316,24.415496],[118.278898,24.414997],[118.278189,24.413438],
+          [118.28665,24.40623],[118.29092,24.40456],[118.29074,24.40199],[118.29561,24.39932],
+          [118.296255,24.396038],[118.30527,24.39576],[118.309184,24.390571],[118.315108,24.390076],
+          [118.318885,24.388236],[118.32022,24.38583],[118.32388,24.38555],[118.32492,24.38777],
+          [118.33093,24.38834],[118.3346,24.39513],[118.33588,24.40236],[118.342944,24.412518],
+          [118.334623,24.419102],[118.329163,24.413954],[118.32527,24.421834],[118.325063,24.425956],
+          [118.328578,24.426149],[118.330394,24.432477],[118.324559,24.432411],[118.326499,24.434334],
+          [118.322956,24.436495],[118.328266,24.44128],[118.325829,24.44412],[118.323634,24.444937],
+          [118.317002,24.438977],[118.313925,24.440451],[118.312485,24.43765],[118.30943,24.437453]
+        ]
+      },
+      {
+        id: 'jinning', name: '金寧', en: 'JINNING', tint: 0x092830,
+        coords: [
+          [118.366837,24.460941],[118.355318,24.464682],[118.351199,24.46427],[118.343839,24.467654],
+          [118.331232,24.475546],[118.31757,24.48784],[118.31047,24.49005],[118.310565,24.487486],
+          [118.303187,24.485686],[118.299392,24.481078],[118.292318,24.478227],[118.28853,24.470484],
+          [118.302943,24.461706],[118.30207,24.45551],[118.30715,24.44719],[118.30943,24.437453],
+          [118.312485,24.43765],[118.313925,24.440451],[118.317002,24.438977],[118.323634,24.444937],
+          [118.325829,24.44412],[118.328266,24.44128],[118.322956,24.436495],[118.326499,24.434334],
+          [118.324559,24.432411],[118.330394,24.432477],[118.328578,24.426149],[118.325063,24.425956],
+          [118.32527,24.421834],[118.329163,24.413954],[118.334623,24.419102],[118.342944,24.412518],
+          [118.35172,24.42173],[118.360556,24.42651],[118.358825,24.430296],[118.361333,24.436927],
+          [118.36385,24.437955],[118.36139,24.4418],[118.360478,24.447996],[118.367808,24.45792],
+          [118.368057,24.460486],[118.366837,24.460941]
+        ]
+      },
+      {
+        id: 'jinhu', name: '金湖', en: 'JINHU', tint: 0x0a2b34,
+        coords: [
+          [118.366837,24.460941],[118.368057,24.460486],[118.367808,24.45792],[118.360478,24.447996],
+          [118.36139,24.4418],[118.36385,24.437955],[118.361333,24.436927],[118.358825,24.430296],
+          [118.360556,24.42651],[118.374738,24.433006],[118.386631,24.435341],[118.40172,24.4352],
+          [118.408295,24.432181],[118.40911,24.42885],[118.409977,24.431831],[118.411071,24.431421],
+          [118.409396,24.427941],[118.412634,24.428611],[118.427314,24.424616],[118.426859,24.425197],
+          [118.428656,24.426114],[118.427377,24.424897],[118.432027,24.419579],[118.434139,24.413825],
+          [118.425643,24.411016],[118.432568,24.412555],[118.433635,24.410426],[118.430048,24.408599],
+          [118.426372,24.409362],[118.426637,24.407165],[118.423505,24.407815],[118.42527,24.406735],
+          [118.434446,24.407756],[118.441526,24.412176],[118.444411,24.41224],[118.449083,24.416037],
+          [118.45321,24.41544],[118.45262,24.41645],[118.45483,24.41729],[118.45543,24.41628],
+          [118.45588,24.41963],[118.453653,24.421713],[118.45472,24.42422],[118.45816,24.426],
+          [118.46049,24.42362],[118.46484,24.42761],[118.46492,24.42915],[118.462682,24.429666],
+          [118.462671,24.433699],[118.4601,24.43466],[118.46037,24.437874],[118.462941,24.438222],
+          [118.46223,24.440162],[118.466,24.44216],[118.4684,24.44184],[118.46946,24.43969],
+          [118.470914,24.440418],[118.47107,24.44167],[118.47261,24.44146],[118.47347,24.44508],
+          [118.47098,24.4441],[118.470095,24.444978],[118.472485,24.447721],[118.47267,24.45186],
+          [118.46822,24.4507],[118.465368,24.453389],[118.460431,24.448899],[118.455154,24.446645],
+          [118.446164,24.454223],[118.435191,24.466541],[118.432967,24.471003],[118.426432,24.470393],
+          [118.41757,24.463458],[118.414772,24.463281],[118.409372,24.459103],[118.405801,24.45965],
+          [118.403254,24.456739],[118.396044,24.453827],[118.392432,24.458905],[118.38963,24.460395],
+          [118.386583,24.459374],[118.382555,24.46146],[118.378813,24.466036],[118.37599,24.46383],
+          [118.377598,24.462479],[118.37523,24.46136],[118.366837,24.460941]
+        ]
+      },
+      {
+        id: 'jinsha', name: '金沙', en: 'JINSHA', tint: 0x0b2932,
+        coords: [
+          [118.465368,24.453389],[118.46269,24.46017],[118.461435,24.475137],[118.4645,24.47615],
+          [118.46801,24.48011],[118.46711,24.48162],[118.46489,24.48078],[118.46374,24.48191],
+          [118.461037,24.47908],[118.45614,24.48232],[118.45322,24.48942],[118.45458,24.4946],
+          [118.44919,24.49598],[118.4478,24.49953],[118.44741,24.5026],[118.45041,24.50886],
+          [118.44623,24.50796],[118.44478,24.50933],[118.44089,24.50819],[118.43945,24.5093],
+          [118.43242,24.50934],[118.42803,24.51846],[118.42949,24.52081],[118.42728,24.51972],
+          [118.42586,24.52404],[118.4276,24.52641],[118.42427,24.5254],[118.41911,24.527912],
+          [118.413694,24.524595],[118.410996,24.526226],[118.4098,24.52946],[118.40784,24.52914],
+          [118.40681,24.52706],[118.410023,24.525256],[118.40944,24.51609],[118.40553,24.51559],
+          [118.4034,24.51257],[118.39419,24.51087],[118.39243,24.50915],[118.39392,24.50688],
+          [118.39388,24.50021],[118.39187,24.498485],[118.39524,24.49383],[118.39385,24.48942],
+          [118.38724,24.48612],[118.38843,24.48411],[118.38707,24.48304],[118.37918,24.48383],
+          [118.38396,24.47986],[118.38368,24.47214],[118.38584,24.47068],[118.38561,24.46913],
+          [118.38061,24.46769],[118.38041,24.46563],[118.378813,24.466036],[118.382555,24.46146],
+          [118.386583,24.459374],[118.38963,24.460395],[118.392432,24.458905],[118.396044,24.453827],
+          [118.403254,24.456739],[118.405801,24.45965],[118.409372,24.459103],[118.414772,24.463281],
+          [118.41757,24.463458],[118.426432,24.470393],[118.432967,24.471003],[118.435191,24.466541],
+          [118.446164,24.454223],[118.455154,24.446645],[118.460431,24.448899],[118.465368,24.453389]
+        ]
+      },
+      {
+        id: 'lieyu', name: '烈嶼', en: 'LIEYU', tint: 0x08242c,
+        coords: [
+          [118.211552,24.412282],[118.21353,24.409844],[118.222434,24.408684],[118.225926,24.405047],
+          [118.230148,24.410975],[118.234029,24.413689],[118.240949,24.414529],[118.241428,24.411261],
+          [118.246285,24.414299],[118.247873,24.416588],[118.245982,24.417196],[118.246712,24.420503],
+          [118.25149,24.424215],[118.257061,24.425189],[118.258904,24.422984],[118.258647,24.424618],
+          [118.260097,24.424286],[118.260478,24.42306],[118.257616,24.421257],[118.26284,24.422452],
+          [118.263262,24.42493],[118.265352,24.425998],[118.262759,24.425593],[118.264762,24.429182],
+          [118.263175,24.433505],[118.267213,24.437355],[118.266378,24.440494],[118.267705,24.443248],
+          [118.263721,24.44421],[118.248642,24.453217],[118.243851,24.452104],[118.244456,24.449941],
+          [118.242312,24.448983],[118.232815,24.449299],[118.229572,24.446945],[118.226307,24.42779],
+          [118.219965,24.426203],[118.219793,24.42867],[118.222204,24.428147],[118.220929,24.429859],
+          [118.219423,24.429236],[118.218719,24.425898],[118.217,24.425556],[118.219846,24.417369],
+          [118.215652,24.412416],[118.211552,24.412282]
+        ]
+      }
+    ];
+
+    const PRESET_SPOTS = [
+      {
+        id: 'xiguoshan', name: '昔果山海灘', en: 'XIGUOSHAN BEACH', district: '金寧鄉',
+        lon: 118.3503, lat: 24.4270, color: 0xf6b86b, theme: 'sunrise',
+        tag: '日出 / 飛機', date: '2026.03.18', time: '05:42',
+        exif: { camera: 'SONY α7R V', lens: 'FE 24mm F1.4 GM', focal: '24 mm', aperture: 'F1.8', shutter: '1/640 s', iso: 'ISO 100' },
+        bortle: 3, cloud: 12,
+        story: '在退潮後的長灘上等待第一道晨光，遠方飛機緩緩掠過天際。這裡是金門最具電影感的日出觀測點之一。'
+      },
+      {
+        id: 'taiwu', name: '太武山', en: 'TAIWU MOUNTAIN', district: '金湖鎮',
+        lon: 118.4170, lat: 24.4616, color: 0x63f5df, theme: 'mountain',
+        tag: '制高點 / 星空', date: '2026.04.21', time: '22:14',
+        exif: { camera: 'Nikon Z8', lens: 'NIKKOR Z 20mm f/1.8 S', focal: '20 mm', aperture: 'F1.8', shutter: '20 s', iso: 'ISO 1600' },
+        bortle: 2, cloud: 18,
+        story: '海拔 253 公尺的太武山是金門制高點。避開月光後，整個島嶼的燈火與銀河會在腳下展開。'
+      },
+      {
+        id: 'cihu', name: '慈湖', en: 'CIHU LAKE', district: '金寧鄉',
+        lon: 118.3037, lat: 24.4675, color: 0xf6b86b, theme: 'sunset',
+        tag: '夕陽 / 星空', date: '2026.04.02', time: '18:36',
+        exif: { camera: 'Sony α7C II', lens: 'FE 35mm F1.4 GM', focal: '35 mm', aperture: 'F4.0', shutter: '1/250 s', iso: 'ISO 100' },
+        bortle: 3, cloud: 22,
+        story: '慈湖與慈堤把海面收進一面長鏡，夕陽落下後，水色會慢慢轉為深藍。候鳥季節更能遇見成群水鳥剪影。'
+      },
+      {
+        id: 'jiangong', name: '建功嶼', en: 'JIANGONG ISLET', district: '金城鎮',
+        lon: 118.3000, lat: 24.4274, color: 0x63f5df, theme: 'tide',
+        tag: '潮汐 / 藍調', date: '2026.05.09', time: '17:28',
+        exif: { camera: 'Canon EOS R6 Mark II', lens: 'RF 24-70mm F2.8 L', focal: '45 mm', aperture: 'F8.0', shutter: '1/125 s', iso: 'ISO 200' },
+        bortle: 3, cloud: 30,
+        story: '摩西分海的石板路只在退潮時出現。建功嶼孤懸於金城南側海面，是拍攝潮汐線與藍調時刻的經典位置。'
+      },
+      {
+        id: 'mofan', name: '模範街', en: 'MOFAN STREET', district: '金城鎮',
+        lon: 118.3192, lat: 24.4318, color: 0xf6b86b, theme: 'street',
+        tag: '街拍 / 燈火', date: '2026.02.14', time: '20:05',
+        exif: { camera: 'FUJIFILM X-T5', lens: 'XF 23mm F2 R WR', focal: '23 mm', aperture: 'F2.0', shutter: '1/60 s', iso: 'ISO 3200' },
+        bortle: 6, cloud: 8,
+        story: '紅磚拱廊與老屋立面在夜色裡亮起暖燈。模範街適合以人眼視角慢慢散步，讓潮濕石板的反射成為畫面的一部分。'
+      }
+    ];
+
+    const PEAKS = [
+      { lon: 118.4165, lat: 24.4616, amp: 7.6, sx: 2.7, sz: 2.2 },
+      { lon: 118.4050, lat: 24.4550, amp: 3.1, sx: 2.4, sz: 2.0 },
+      { lon: 118.3900, lat: 24.4480, amp: 2.2, sx: 2.0, sz: 1.8 },
+      { lon: 118.3250, lat: 24.4400, amp: 1.5, sx: 2.2, sz: 2.0 },
+      { lon: 118.3500, lat: 24.4300, amp: 1.1, sx: 1.9, sz: 1.7 },
+      { lon: 118.4400, lat: 24.4900, amp: 1.4, sx: 2.1, sz: 2.0 },
+      { lon: 118.2420, lat: 24.4350, amp: 1.4, sx: 2.0, sz: 2.2 }
+    ].map((peak) => {
+      const [x, z] = project(peak.lon, peak.lat);
+      return { ...peak, x, z };
+    });
+
+    const DISTRICT_LABELS = [
+      { lon: 118.312, lat: 24.423, name: '金城', en: 'JINCHENG' },
+      { lon: 118.329, lat: 24.468, name: '金寧', en: 'JINNING' },
+      { lon: 118.409, lat: 24.432, name: '金湖', en: 'JINHU' },
+      { lon: 118.426, lat: 24.492, name: '金沙', en: 'JINSHA' },
+      { lon: 118.243, lat: 24.432, name: '烈嶼', en: 'LIEYU' }
+    ];
+
+    /* ------------------------------------------------------------------ */
+    /* Scene state                                                         */
+    /* ------------------------------------------------------------------ */
+    let renderer;
+    let scene;
+    let camera;
+    let controls;
+    let world;
+    let clock;
+    let raycaster;
+    const pointer = new THREE.Vector2();
+    const tempVector = new THREE.Vector3();
+    const tempVector2 = new THREE.Vector3();
+    const mapPickables = [];
+    const pinHitMeshes = [];
+    const pins = [];
+    const pinMap = new Map();
+    const townWorld = [];
+    const allSpots = [];
+    let customSpots = [];
+    let selectedSpotId = null;
+    let hoveredPinId = null;
+    let addMode = false;
+    let isDragging = false;
+    let draftPin = null;
+    let draftLocation = null;
+    let pendingPhoto = null;
+    let pendingExif = { ...DEFAULT_EXIF };
+    let pendingGps = null;
+    let pendingDate = null;
+    let isParsingPhoto = false;
+    let starMaterial = null;
+    let starField = null;
+    let gridMaterial = null;
+    let terrainMesh = null;
+    let bridgeCurve = null;
+    let bridgeRunner = null;
+    let peakBeacon = null;
+    let selectedDeleteHandler = null;
+    let lastPointerCheck = 0;
+    let pointerDown = null;
+
+    const glowMeshes = [];
+    const districtSprites = [];
+
+    /* ------------------------------------------------------------------ */
+    /* Renderer, camera, lights                                            */
+    /* ------------------------------------------------------------------ */
+    function initScene() {
+      renderer = new THREE.WebGLRenderer({
+        canvas,
+        antialias: true,
+        alpha: true,
+        powerPreference: 'high-performance'
+      });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setClearColor(0x000000, 0);
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.12;
+
+      scene = new THREE.Scene();
+      clock = new THREE.Clock();
+      raycaster = new THREE.Raycaster();
+      raycaster.params.Points.threshold = 0.5;
+
+      camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.1, 1200);
+      camera.position.set(0, 72, 80);
+
+      controls = new OrbitControls(camera, renderer.domElement);
+      controls.target.set(0, 3.0, -1.5);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.055;
+      controls.rotateSpeed = 0.52;
+      controls.panSpeed = 0.72;
+      controls.zoomSpeed = 0.76;
+      controls.minDistance = 28;
+      controls.maxDistance = 175;
+      controls.minPolarAngle = 0.2;
+      controls.maxPolarAngle = Math.PI * 0.435;
+      controls.screenSpacePanning = false;
+      controls.enablePan = true;
+      controls.update();
+
+      const ambient = new THREE.AmbientLight(0x25434a, 1.2);
+      scene.add(ambient);
+      const hemisphere = new THREE.HemisphereLight(0x6adfd4, 0x081014, 1.35);
+      scene.add(hemisphere);
+      const keyLight = new THREE.DirectionalLight(0x9df8ec, 2.25);
+      keyLight.position.set(34, 58, 38);
+      scene.add(keyLight);
+      const rimLight = new THREE.DirectionalLight(0xf6b86b, 1.15);
+      rimLight.position.set(-38, 24, -42);
+      scene.add(rimLight);
+      const fillLight = new THREE.DirectionalLight(0x346b91, 0.85);
+      fillLight.position.set(-18, 40, 36);
+      scene.add(fillLight);
+
+      buildStarfield();
+      buildTacticalBoard();
+      buildGlowBeds();
+      buildWorld();
+      buildBridge();
+      buildDistrictLabels();
+      loadStoredSpots();
+      allSpots.push(...PRESET_SPOTS, ...customSpots);
+      buildAllPins();
+      updateSpotDock();
+      bindEvents();
+      window.addEventListener('resize', onResize);
+      animate();
+    }
+
+    function buildStarfield() {
+      const count = 5800;
+      const positions = new Float32Array(count * 3);
+      const sizes = new Float32Array(count);
+      const phases = new Float32Array(count);
+      const colors = new Float32Array(count * 3);
+      const palette = [0xd8fbff, 0x8df4e8, 0xf9cf98, 0xb7c9ff, 0xffffff];
+      const random = mulberry32(871211);
+
+      for (let i = 0; i < count; i += 1) {
+        const radius = 170 + random() * 330;
+        const theta = random() * Math.PI * 2;
+        const phi = Math.acos(2 * random() - 1);
+        const sinPhi = Math.sin(phi);
+        positions[i * 3] = radius * sinPhi * Math.cos(theta);
+        positions[i * 3 + 1] = radius * Math.cos(phi);
+        positions[i * 3 + 2] = radius * sinPhi * Math.sin(theta);
+        sizes[i] = 0.55 + Math.pow(random(), 3.1) * 4.3;
+        phases[i] = random() * Math.PI * 2;
+        const color = new THREE.Color(palette[Math.floor(random() * palette.length)]);
+        color.multiplyScalar(0.7 + random() * 0.3);
+        colors[i * 3] = color.r;
+        colors[i * 3 + 1] = color.g;
+        colors[i * 3 + 2] = color.b;
+      }
+
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      geometry.setAttribute('aSize', new THREE.BufferAttribute(sizes, 1));
+      geometry.setAttribute('aPhase', new THREE.BufferAttribute(phases, 1));
+      geometry.setAttribute('aColor', new THREE.BufferAttribute(colors, 3));
+
+      starMaterial = new THREE.ShaderMaterial({
+        uniforms: { uTime: { value: 0 } },
+        vertexShader: `
+          attribute float aSize;
+          attribute float aPhase;
+          attribute vec3 aColor;
+          varying vec3 vColor;
+          varying float vAlpha;
+          uniform float uTime;
+          void main() {
+            vColor = aColor;
+            vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+            float twinkle = 0.56 + 0.44 * sin(uTime * 0.68 + aPhase * 5.0);
+            vAlpha = twinkle;
+            gl_PointSize = aSize * (390.0 / max(1.0, -mvPosition.z));
+            gl_Position = projectionMatrix * mvPosition;
+          }
+        `,
+        fragmentShader: `
+          varying vec3 vColor;
+          varying float vAlpha;
+          void main() {
+            vec2 uv = gl_PointCoord - 0.5;
+            float dist = length(uv);
+            if (dist > 0.5) discard;
+            float core = smoothstep(0.5, 0.0, dist);
+            float glow = pow(core, 2.2);
+            gl_FragColor = vec4(vColor, glow * vAlpha);
+          }
+        `,
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending
+      });
+
+      starField = new THREE.Points(geometry, starMaterial);
+      starField.frustumCulled = false;
+      scene.add(starField);
+    }
+
+    function buildTacticalBoard() {
+      const geometry = new THREE.PlaneGeometry(230, 230, 1, 1);
+      gridMaterial = new THREE.ShaderMaterial({
+        uniforms: {
+          uTime: { value: 0 },
+          uCyan: { value: new THREE.Color(0x54d9c9) },
+          uAmber: { value: new THREE.Color(0xb58651) }
+        },
+        vertexShader: `
+          varying vec3 vWorld;
+          void main() {
+            vec4 world = modelMatrix * vec4(position, 1.0);
+            vWorld = world.xyz;
+            gl_Position = projectionMatrix * viewMatrix * world;
+          }
+        `,
+        fragmentShader: `
+          varying vec3 vWorld;
+          uniform float uTime;
+          uniform vec3 uCyan;
+          uniform vec3 uAmber;
+          float grid(vec2 p) {
+            vec2 q = abs(fract(p) - 0.5);
+            float d = max(q.x, q.y);
+            return 1.0 - smoothstep(0.475, 0.5, d);
+          }
+          void main() {
+            float dist = length(vWorld.xz);
+            float fade = 1.0 - smoothstep(18.0, 106.0, dist);
+            float minor = grid(vWorld.xz / 4.0);
+            float major = grid(vWorld.xz / 20.0);
+            float radial = abs(dist - 35.0);
+            float ring1 = 1.0 - smoothstep(0.0, 0.28, radial);
+            float scanRadius = mod(uTime * 3.2, 78.0);
+            float scan = 1.0 - smoothstep(0.0, 0.5, abs(dist - scanRadius));
+            float angle = atan(vWorld.z, vWorld.x);
+            float sweep = smoothstep(0.0, 1.0, sin(angle - uTime * 0.15) * 0.5 + 0.5);
+            vec3 color = mix(uCyan, uAmber, 0.25 + 0.2 * sin(angle * 2.0));
+            float alpha = (minor * 0.13 + major * 0.20 + ring1 * 0.18 + scan * 0.14) * fade;
+            alpha *= 0.62 + sweep * 0.18;
+            gl_FragColor = vec4(color, alpha);
+          }
+        `,
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        side: THREE.DoubleSide
+      });
+      const board = new THREE.Mesh(geometry, gridMaterial);
+      board.rotation.x = -Math.PI / 2;
+      board.position.y = -2.7;
+      scene.add(board);
+    }
+
+    function createRadialTexture() {
+      const size = 256;
+      const surface = document.createElement('canvas');
+      surface.width = size;
+      surface.height = size;
+      const ctx = surface.getContext('2d');
+      const gradient = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+      gradient.addColorStop(0, 'rgba(255,255,255,0.72)');
+      gradient.addColorStop(0.18, 'rgba(255,255,255,0.34)');
+      gradient.addColorStop(0.55, 'rgba(255,255,255,0.08)');
+      gradient.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, size, size);
+      const texture = new THREE.CanvasTexture(surface);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      return texture;
+    }
+
+    function buildGlowBeds() {
+      const texture = createRadialTexture();
+      const cyanGlow = new THREE.Mesh(
+        new THREE.PlaneGeometry(96, 60),
+        new THREE.MeshBasicMaterial({
+          map: texture, color: 0x31d7c8, transparent: true, opacity: 0.42,
+          depthWrite: false, blending: THREE.AdditiveBlending
+        })
+      );
+      cyanGlow.rotation.x = -Math.PI / 2;
+      cyanGlow.position.set(2, -2.15, 1);
+      cyanGlow.userData.baseOpacity = 0.42;
+      cyanGlow.userData.phase = 0;
+      scene.add(cyanGlow);
+      glowMeshes.push(cyanGlow);
+
+      const amberGlow = new THREE.Mesh(
+        new THREE.PlaneGeometry(36, 30),
+        new THREE.MeshBasicMaterial({
+          map: texture, color: 0xf6b86b, transparent: true, opacity: 0.2,
+          depthWrite: false, blending: THREE.AdditiveBlending
+        })
+      );
+      amberGlow.rotation.x = -Math.PI / 2;
+      amberGlow.position.set(15, -2.0, 1);
+      amberGlow.userData.baseOpacity = 0.2;
+      amberGlow.userData.phase = 1.8;
+      scene.add(amberGlow);
+      glowMeshes.push(amberGlow);
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* 3D island, terrain blocks, bridge and labels                        */
+    /* ------------------------------------------------------------------ */
+    function makeShapeFromWorldRing(worldRing) {
+      const shape = new THREE.Shape();
+      worldRing.forEach(([x, z], index) => {
+        if (index === 0) shape.moveTo(x, -z);
+        else shape.lineTo(x, -z);
+      });
+      shape.closePath();
+      return shape;
+    }
+
+    function buildWorld() {
+      world = new THREE.Group();
+      world.name = 'KinmenTerrain';
+      scene.add(world);
+
+      TOWNS.forEach((town) => {
+        const coords = normalizeRing(town.coords);
+        const worldRing = coords.map(([lon, lat]) => project(lon, lat));
+        townWorld.push({ ...town, coords, worldRing });
+
+        const shape = makeShapeFromWorldRing(worldRing);
+        const geometry = new THREE.ExtrudeGeometry(shape, {
+          depth: TOWN_DEPTH,
+          steps: 1,
+          bevelEnabled: true,
+          bevelThickness: 0.15,
+          bevelSize: 0.14,
+          bevelSegments: 2,
+          curveSegments: 1
+        });
+
+        const topMaterial = new THREE.MeshPhysicalMaterial({
+          color: town.tint,
+          metalness: 0.66,
+          roughness: 0.34,
+          clearcoat: 0.72,
+          clearcoatRoughness: 0.5,
+          emissive: 0x0a3c42,
+          emissiveIntensity: 0.28,
+          side: THREE.DoubleSide
+        });
+        const sideMaterial = new THREE.MeshStandardMaterial({
+          color: 0x03141a,
+          metalness: 0.82,
+          roughness: 0.32,
+          emissive: 0x0c4d52,
+          emissiveIntensity: 0.6
+        });
+
+        const mesh = new THREE.Mesh(geometry, [topMaterial, sideMaterial]);
+        mesh.rotation.x = -Math.PI / 2;
+        mesh.userData.townId = town.id;
+        mesh.userData.townName = town.name;
+        world.add(mesh);
+        mapPickables.push(mesh);
+
+        const edges = new THREE.LineSegments(
+          new THREE.EdgesGeometry(geometry, 32),
+          new THREE.LineBasicMaterial({
+            color: 0x5df3df, transparent: true, opacity: 0.14,
+            depthWrite: false, blending: THREE.AdditiveBlending
+          })
+        );
+        edges.rotation.x = -Math.PI / 2;
+        world.add(edges);
+
+        const outlinePoints = worldRing.map(([x, z]) => new THREE.Vector3(x, TOWN_TOP + 0.055, z));
+        const outlineGeometry = new THREE.BufferGeometry().setFromPoints(outlinePoints);
+        const outline = new THREE.LineLoop(outlineGeometry, new THREE.LineBasicMaterial({
+          color: 0x6dffe9, transparent: true, opacity: 0.55,
+          depthWrite: false, blending: THREE.AdditiveBlending
+        }));
+        world.add(outline);
+
+        const basePoints = worldRing.map(([x, z]) => new THREE.Vector3(x, 0.07, z));
+        const baseOutline = new THREE.LineLoop(
+          new THREE.BufferGeometry().setFromPoints(basePoints),
+          new THREE.LineBasicMaterial({
+            color: 0x2b8d8c, transparent: true, opacity: 0.2,
+            depthWrite: false, blending: THREE.AdditiveBlending
+          })
+        );
+        world.add(baseOutline);
+      });
+
+      buildTerrainBlocks();
+      buildJiangongIslet();
+    }
+
+    function insideLand(x, z) {
+      return townWorld.some((town) => pointInRing(x, z, town.worldRing));
+    }
+
+    function insideLandWithMargin(x, z, margin = 0.56) {
+      return insideLand(x, z)
+        && insideLand(x + margin, z)
+        && insideLand(x - margin, z)
+        && insideLand(x, z + margin)
+        && insideLand(x, z - margin);
+    }
+
+    function terrainHeightAt(x, z) {
+      let height = 0.24;
+      PEAKS.forEach((peak) => {
+        const dx = (x - peak.x) / peak.sx;
+        const dz = (z - peak.z) / peak.sz;
+        height += peak.amp * Math.exp(-(dx * dx + dz * dz) * 1.12);
+      });
+      height += 0.2 * Math.sin(x * 0.63 + 1.7) * Math.cos(z * 0.56 - 0.8);
+      height += 0.12 * Math.sin((x + z) * 1.08);
+      return Math.max(0.16, height);
+    }
+
+    function groundHeightForPoint(x, z) {
+      if (insideLand(x, z)) {
+        return TERRAIN_BASE + terrainHeightAt(x, z);
+      }
+      return 0.35;
+    }
+
+    function buildTerrainBlocks() {
+      let minX = Infinity;
+      let maxX = -Infinity;
+      let minZ = Infinity;
+      let maxZ = -Infinity;
+      townWorld.forEach((town) => {
+        town.worldRing.forEach(([x, z]) => {
+          minX = Math.min(minX, x);
+          maxX = Math.max(maxX, x);
+          minZ = Math.min(minZ, z);
+          maxZ = Math.max(maxZ, z);
+        });
+      });
+
+      const tile = 1.48;
+      const gap = 0.065;
+      const matrices = [];
+      const heights = [];
+      const low = new THREE.Color(0x0c3038);
+      const mid = new THREE.Color(0x12615d);
+      const high = new THREE.Color(0x9b6936);
+      const color = new THREE.Color();
+
+      for (let x = minX; x <= maxX; x += tile) {
+        for (let z = minZ; z <= maxZ; z += tile) {
+          if (!insideLandWithMargin(x, z, 0.48)) continue;
+          const height = terrainHeightAt(x, z);
+          const matrix = new THREE.Matrix4();
+          const position = new THREE.Vector3(x, TERRAIN_BASE + height / 2, z);
+          const rotation = new THREE.Quaternion();
+          const scale = new THREE.Vector3(1, height, 1);
+          matrix.compose(position, rotation, scale);
+          matrices.push(matrix);
+          heights.push(height);
+        }
+      }
+
+      const count = matrices.length;
+      const geometry = new THREE.BoxGeometry(tile - gap, 1, tile - gap);
+      const material = new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        metalness: 0.72,
+        roughness: 0.35,
+        emissive: 0x062f32,
+        emissiveIntensity: 0.48,
+        transparent: true,
+        opacity: 0.96
+      });
+
+      terrainMesh = new THREE.InstancedMesh(geometry, material, count);
+      terrainMesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);
+      terrainMesh.userData.isTerrain = true;
+      for (let i = 0; i < count; i += 1) {
+        terrainMesh.setMatrixAt(i, matrices[i]);
+        const normalized = clamp(heights[i] / 7.0, 0, 1);
+        if (normalized < 0.58) {
+          color.copy(low).lerp(mid, normalized / 0.58);
+        } else {
+          color.copy(mid).lerp(high, (normalized - 0.58) / 0.42);
+        }
+        terrainMesh.setColorAt(i, color);
+      }
+      terrainMesh.instanceMatrix.needsUpdate = true;
+      if (terrainMesh.instanceColor) terrainMesh.instanceColor.needsUpdate = true;
+      world.add(terrainMesh);
+      mapPickables.push(terrainMesh);
+
+      const wireMaterial = new THREE.MeshBasicMaterial({
+        color: 0x79ffe9,
+        wireframe: true,
+        transparent: true,
+        opacity: 0.055,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending
+      });
+      const wireTerrain = new THREE.InstancedMesh(geometry, wireMaterial, count);
+      for (let i = 0; i < count; i += 1) wireTerrain.setMatrixAt(i, matrices[i]);
+      wireTerrain.instanceMatrix.needsUpdate = true;
+      world.add(wireTerrain);
+
+      buildTaiwuContours();
+      buildTaiwuBeacon();
+    }
+
+    function buildTaiwuContours() {
+      const peak = PEAKS[0];
+      const contourMaterial = new THREE.LineBasicMaterial({
+        color: 0xf1b46d,
+        transparent: true,
+        opacity: 0.22,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending
+      });
+      [6.1, 4.8, 3.7, 2.6, 1.55].forEach((radius, ringIndex) => {
+        const points = [];
+        for (let i = 0; i <= 72; i += 1) {
+          const angle = (i / 72) * Math.PI * 2;
+          const x = peak.x + Math.cos(angle) * radius;
+          const z = peak.z + Math.sin(angle) * radius * 0.76;
+          const y = TERRAIN_BASE + terrainHeightAt(x, z) + 0.23 + ringIndex * 0.014;
+          points.push(new THREE.Vector3(x, y, z));
+        }
+        const line = new THREE.LineLoop(
+          new THREE.BufferGeometry().setFromPoints(points),
+          contourMaterial.clone()
+        );
+        line.material.opacity = 0.3 - ringIndex * 0.035;
+        world.add(line);
+      });
+    }
+
+    function buildTaiwuBeacon() {
+      const peak = PEAKS[0];
+      const top = TERRAIN_BASE + terrainHeightAt(peak.x, peak.z);
+      peakBeacon = new THREE.Group();
+      peakBeacon.position.set(peak.x, top, peak.z);
+
+      const pole = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.035, 0.07, 4.2, 6),
+        new THREE.MeshBasicMaterial({ color: 0xf6b86b, transparent: true, opacity: 0.52 })
+      );
+      pole.position.y = 2.1;
+      peakBeacon.add(pole);
+
+      const beaconCore = new THREE.Mesh(
+        new THREE.SphereGeometry(0.15, 12, 12),
+        new THREE.MeshBasicMaterial({ color: 0xffdfac })
+      );
+      beaconCore.position.y = 4.25;
+      peakBeacon.add(beaconCore);
+
+      const beaconGlow = new THREE.Sprite(new THREE.SpriteMaterial({
+        map: createRadialTexture(), color: 0xf6b86b, transparent: true,
+        opacity: 0.62, depthWrite: false, blending: THREE.AdditiveBlending
+      }));
+      beaconGlow.scale.set(2.4, 2.4, 1);
+      beaconGlow.position.y = 4.25;
+      peakBeacon.add(beaconGlow);
+      world.add(peakBeacon);
+    }
+
+    function buildJiangongIslet() {
+      const [x, z] = project(118.3000, 24.4274);
+      const islet = new THREE.Mesh(
+        new THREE.CylinderGeometry(1.02, 1.36, 0.62, 9),
+        new THREE.MeshStandardMaterial({
+          color: 0x0a2a30, metalness: 0.6, roughness: 0.42,
+          emissive: 0x0b4e4e, emissiveIntensity: 0.5
+        })
+      );
+      islet.position.set(x, 0.31, z);
+      islet.userData.isIslet = true;
+      world.add(islet);
+      mapPickables.push(islet);
+
+      const ring = new THREE.Mesh(
+        new THREE.RingGeometry(1.55, 1.68, 48),
+        new THREE.MeshBasicMaterial({
+          color: 0x6dffe9, transparent: true, opacity: 0.36,
+          side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending
+        })
+      );
+      ring.rotation.x = -Math.PI / 2;
+      ring.position.set(x, 0.06, z);
+      world.add(ring);
+    }
+
+    function makeTextSprite(name, en, color = '#dffff8', width = 8.6) {
+      const textureCanvas = document.createElement('canvas');
+      textureCanvas.width = 512;
+      textureCanvas.height = 160;
+      const ctx = textureCanvas.getContext('2d');
+      ctx.clearRect(0, 0, 512, 160);
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.shadowColor = 'rgba(68, 240, 216, 0.35)';
+      ctx.shadowBlur = 16;
+      ctx.fillStyle = color;
+      ctx.font = '500 50px "Noto Sans TC", sans-serif';
+      ctx.fillText(name, 256, 64);
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = 'rgba(150, 221, 211, 0.64)';
+      ctx.font = '300 18px "JetBrains Mono", monospace';
+      ctx.fillText(en, 256, 116);
+
+      const texture = new THREE.CanvasTexture(textureCanvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+        map: texture,
+        transparent: true,
+        opacity: 0.76,
+        depthTest: false,
+        depthWrite: false
+      }));
+      sprite.scale.set(width, width * 0.3125, 1);
+      sprite.renderOrder = 20;
+      return sprite;
+    }
+
+    function buildDistrictLabels() {
+      DISTRICT_LABELS.forEach((label, index) => {
+        const [x, z] = project(label.lon, label.lat);
+        const sprite = makeTextSprite(label.name, label.en, index === 4 ? '#f3c68c' : '#dffff8', 7.2);
+        sprite.position.set(x, 8.4 + Math.sin(index) * 0.25, z);
+        sprite.userData.baseY = sprite.position.y;
+        sprite.userData.phase = index * 1.2;
+        districtSprites.push(sprite);
+        world.add(sprite);
+      });
+
+      const peak = PEAKS[0];
+      const peakSprite = makeTextSprite('太武山 253M', 'TAIWU PEAK', '#ffd29a', 5.2);
+      peakSprite.position.set(peak.x, TERRAIN_BASE + terrainHeightAt(peak.x, peak.z) + 6.4, peak.z);
+      peakSprite.material.opacity = 0.62;
+      world.add(peakSprite);
+      districtSprites.push(peakSprite);
+    }
+
+    function buildBridge() {
+      const [ax, az] = project(118.3051, 24.4521);
+      const [bx, bz] = project(118.2696, 24.4490);
+      const points = [];
+      for (let i = 0; i <= 36; i += 1) {
+        const t = i / 36;
+        const arch = Math.sin(t * Math.PI) * 5.0;
+        points.push(new THREE.Vector3(
+          THREE.MathUtils.lerp(ax, bx, t),
+          TOWN_TOP + 0.72 + arch,
+          THREE.MathUtils.lerp(az, bz, t)
+        ));
+      }
+      bridgeCurve = new THREE.CatmullRomCurve3(points);
+
+      const glowTube = new THREE.Mesh(
+        new THREE.TubeGeometry(bridgeCurve, 100, 0.34, 6, false),
+        new THREE.MeshBasicMaterial({
+          color: 0x58ead7, transparent: true, opacity: 0.09,
+          depthWrite: false, blending: THREE.AdditiveBlending
+        })
+      );
+      world.add(glowTube);
+
+      const deck = new THREE.Mesh(
+        new THREE.TubeGeometry(bridgeCurve, 100, 0.085, 6, false),
+        new THREE.MeshBasicMaterial({ color: 0x83ffee, transparent: true, opacity: 0.82 })
+      );
+      world.add(deck);
+
+      const towerMaterial = new THREE.MeshBasicMaterial({ color: 0xf6b86b, transparent: true, opacity: 0.64 });
+      [0.28, 0.72].forEach((t) => {
+        const point = bridgeCurve.getPointAt(t);
+        const tower = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.09, 6.2, 6), towerMaterial);
+        tower.position.set(point.x, point.y + 3.0, point.z);
+        world.add(tower);
+
+        const top = new THREE.Vector3(point.x, point.y + 6.0, point.z);
+        const cablePositions = [];
+        [-0.08, -0.04, 0.04, 0.08].forEach((offset) => {
+          const other = bridgeCurve.getPointAt(clamp(t + offset, 0.01, 0.99));
+          cablePositions.push(top.x, top.y, top.z, other.x, other.y + 0.02, other.z);
+        });
+        const cableGeometry = new THREE.BufferGeometry();
+        cableGeometry.setAttribute('position', new THREE.Float32BufferAttribute(cablePositions, 3));
+        const cables = new THREE.LineSegments(cableGeometry, new THREE.LineBasicMaterial({
+          color: 0x8ef8e7, transparent: true, opacity: 0.32,
+          depthWrite: false, blending: THREE.AdditiveBlending
+        }));
+        world.add(cables);
+      });
+
+      bridgeRunner = new THREE.Mesh(
+        new THREE.SphereGeometry(0.16, 10, 10),
+        new THREE.MeshBasicMaterial({ color: 0xffd494 })
+      );
+      world.add(bridgeRunner);
+
+      const midpoint = bridgeCurve.getPointAt(0.5);
+      const bridgeLabel = makeTextSprite('金門大橋', 'KINMEN BRIDGE', '#f6c68d', 5.9);
+      bridgeLabel.position.set(midpoint.x, midpoint.y + 7.15, midpoint.z);
+      bridgeLabel.material.opacity = 0.6;
+      world.add(bridgeLabel);
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Light-trace pins                                                    */
+    /* ------------------------------------------------------------------ */
+    function buildAllPins() {
+      allSpots.forEach((spot, index) => {
+        createPin(spot, index);
+      });
+    }
+
+    function createPin(spot, index) {
+      const [x, z] = project(spot.lon, spot.lat);
+      const ground = groundHeightForPoint(x, z);
+      const color = new THREE.Color(spot.color || (spot.custom ? 0xf6b86b : 0x63f5df));
+      const group = new THREE.Group();
+      group.position.set(x, ground + 0.25, z);
+      group.userData.spotId = spot.id;
+
+      const ringMaterial = new THREE.MeshBasicMaterial({
+        color, transparent: true, opacity: 0.62, side: THREE.DoubleSide,
+        depthWrite: false, blending: THREE.AdditiveBlending
+      });
+      const ring = new THREE.Mesh(new THREE.RingGeometry(0.63, 0.88, 48), ringMaterial);
+      ring.rotation.x = -Math.PI / 2;
+      ring.position.y = 0.05;
+      group.add(ring);
+
+      const ringMaterial2 = new THREE.MeshBasicMaterial({
+        color, transparent: true, opacity: 0.24, side: THREE.DoubleSide,
+        depthWrite: false, blending: THREE.AdditiveBlending
+      });
+      const ring2 = new THREE.Mesh(new THREE.RingGeometry(1.02, 1.12, 48), ringMaterial2);
+      ring2.rotation.x = -Math.PI / 2;
+      ring2.position.y = 0.035;
+      group.add(ring2);
+
+      const beamMaterial = new THREE.ShaderMaterial({
+        uniforms: {
+          uTime: { value: 0 },
+          uColor: { value: color.clone() }
+        },
+        vertexShader: `
+          varying vec2 vUv;
+          void main() {
+            vUv = uv;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          }
+        `,
+        fragmentShader: `
+          varying vec2 vUv;
+          uniform float uTime;
+          uniform vec3 uColor;
+          void main() {
+            float vertical = pow(1.0 - vUv.y, 1.35);
+            float pulse = 0.72 + 0.28 * sin(vUv.y * 22.0 - uTime * 3.2);
+            float edge = smoothstep(0.0, 0.12, vUv.x) * smoothstep(0.0, 0.12, 1.0 - vUv.x);
+            float alpha = vertical * (0.10 + pulse * 0.12) * (0.62 + edge * 0.38);
+            gl_FragColor = vec4(uColor, alpha);
+          }
+        `,
+        transparent: true,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+        blending: THREE.AdditiveBlending
+      });
+      const beam = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.075, 0.34, 6.3, 18, 1, true),
+        beamMaterial
+      );
+      beam.position.y = 3.15;
+      group.add(beam);
+
+      const orb = new THREE.Group();
+      orb.position.y = 6.05;
+      group.add(orb);
+
+      const orbCore = new THREE.Mesh(
+        new THREE.SphereGeometry(0.2, 16, 16),
+        new THREE.MeshBasicMaterial({ color: 0xf2fffc })
+      );
+      orb.add(orbCore);
+
+      const orbShell = new THREE.Mesh(
+        new THREE.SphereGeometry(0.39, 20, 20),
+        new THREE.MeshBasicMaterial({
+          color, transparent: true, opacity: 0.26,
+          depthWrite: false, blending: THREE.AdditiveBlending
+        })
+      );
+      orb.add(orbShell);
+
+      const orbGlow = new THREE.Sprite(new THREE.SpriteMaterial({
+        map: createRadialTexture(), color, transparent: true,
+        opacity: 0.66, depthWrite: false, blending: THREE.AdditiveBlending
+      }));
+      orbGlow.scale.set(3.0, 3.0, 1);
+      orb.add(orbGlow);
+
+      const halo = new THREE.Sprite(new THREE.SpriteMaterial({
+        map: createRadialTexture(), color, transparent: true,
+        opacity: 0.18, depthWrite: false, blending: THREE.AdditiveBlending
+      }));
+      halo.scale.set(7.0, 7.0, 1);
+      halo.position.y = 5.1;
+      group.add(halo);
+
+      const hit = new THREE.Mesh(
+        new THREE.SphereGeometry(2.45, 10, 10),
+        new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false })
+      );
+      hit.position.y = 4.9;
+      hit.userData.pinId = spot.id;
+      group.add(hit);
+      pinHitMeshes.push(hit);
+
+      world.add(group);
+
+      const pin = {
+        id: spot.id,
+        index,
+        data: spot,
+        group,
+        ring,
+        ring2,
+        ringMaterial,
+        ringMaterial2,
+        beamMaterial,
+        orb,
+        orbGlow,
+        halo,
+        ground,
+        baseY: ground + 0.25,
+        phase: (index * 1.37) % (Math.PI * 2),
+        hoverScale: 1,
+        hovered: false
+      };
+      pins.push(pin);
+      pinMap.set(spot.id, pin);
+      return pin;
+    }
+
+    function removePin(id) {
+      const pin = pinMap.get(id);
+      if (!pin) return;
+      world.remove(pin.group);
+      const hitIndex = pinHitMeshes.findIndex((mesh) => mesh.userData.pinId === id);
+      if (hitIndex >= 0) pinHitMeshes.splice(hitIndex, 1);
+      const pinIndex = pins.findIndex((item) => item.id === id);
+      if (pinIndex >= 0) pins.splice(pinIndex, 1);
+      pinMap.delete(id);
+      pin.group.traverse((child) => {
+        if (child.geometry) child.geometry.dispose();
+        if (child.material) {
+          if (Array.isArray(child.material)) child.material.forEach((mat) => mat.dispose());
+          else child.material.dispose();
+        }
+      });
+    }
+
+    function createDraftPin(x, z, ground) {
+      if (draftPin) {
+        world.remove(draftPin.group);
+        draftPin = null;
+      }
+      const color = new THREE.Color(0xf6b86b);
+      const group = new THREE.Group();
+      group.position.set(x, ground + 0.3, z);
+
+      const ring = new THREE.Mesh(
+        new THREE.RingGeometry(0.9, 1.15, 48),
+        new THREE.MeshBasicMaterial({
+          color, transparent: true, opacity: 0.75, side: THREE.DoubleSide,
+          depthWrite: false, blending: THREE.AdditiveBlending
+        })
+      );
+      ring.rotation.x = -Math.PI / 2;
+      group.add(ring);
+
+      const beam = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.06, 0.22, 5.1, 14, 1, true),
+        new THREE.MeshBasicMaterial({
+          color, transparent: true, opacity: 0.2,
+          depthWrite: false, blending: THREE.AdditiveBlending
+        })
+      );
+      beam.position.y = 2.55;
+      group.add(beam);
+
+      const orb = new THREE.Mesh(
+        new THREE.SphereGeometry(0.28, 14, 14),
+        new THREE.MeshBasicMaterial({ color: 0xffe1b0 })
+      );
+      orb.position.y = 5.35;
+      group.add(orb);
+
+      const glow = new THREE.Sprite(new THREE.SpriteMaterial({
+        map: createRadialTexture(), color, transparent: true,
+        opacity: 0.8, depthWrite: false, blending: THREE.AdditiveBlending
+      }));
+      glow.scale.set(3.4, 3.4, 1);
+      glow.position.y = 5.35;
+      group.add(glow);
+
+      world.add(group);
+      draftPin = { group, ring, beam, orb, glow, baseY: ground + 0.3, phase: 0 };
+    }
+
+    function clearDraftPin() {
+      if (!draftPin) return;
+      world.remove(draftPin.group);
+      draftPin.group.traverse((child) => {
+        if (child.geometry) child.geometry.dispose();
+        if (child.material) child.material.dispose();
+      });
+      draftPin = null;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Raycasting, hover, camera transitions                               */
+    /* ------------------------------------------------------------------ */
+    function updatePointer(event) {
+      const rect = renderer.domElement.getBoundingClientRect();
+      pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+      pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+    }
+
+    function pickPin(event) {
+      updatePointer(event);
+      raycaster.setFromCamera(pointer, camera);
+      const hits = raycaster.intersectObjects(pinHitMeshes, false);
+      if (!hits.length) return null;
+      return pinMap.get(hits[0].object.userData.pinId) || null;
+    }
+
+    function pickMap(event) {
+      updatePointer(event);
+      raycaster.setFromCamera(pointer, camera);
+      const hits = raycaster.intersectObjects(mapPickables, false);
+      return hits.length ? hits[0] : null;
+    }
+
+    function setHoveredPin(pin) {
+      if (hoveredPinId === (pin ? pin.id : null)) return;
+      hoveredPinId = pin ? pin.id : null;
+      pins.forEach((item) => {
+        item.hovered = Boolean(pin && item.id === pin.id);
+        if (item.hovered) {
+          $('#tipName').textContent = item.data.name;
+          $('#tipMeta').textContent = `${item.data.custom ? 'CUSTOM TRACE' : item.data.tag} · ${item.data.custom ? 'LIGHT TRACE' : 'KM-' + pad2(item.index + 1)}`;
+          $('#tipCoord').textContent = `${item.data.lat.toFixed(4)} N / ${item.data.lon.toFixed(4)} E`;
+          pinTooltip.classList.add('visible');
+        }
+      });
+      if (!pin) pinTooltip.classList.remove('visible');
+    }
+
+    function updateTooltipPosition() {
+      if (!hoveredPinId || !pinTooltip.classList.contains('visible')) return;
+      const pin = pinMap.get(hoveredPinId);
+      if (!pin) return;
+      pin.orb.getWorldPosition(tempVector);
+      tempVector.project(camera);
+      if (tempVector.z > 1 || tempVector.z < -1) {
+        pinTooltip.classList.remove('visible');
+        return;
+      }
+      const x = (tempVector.x * 0.5 + 0.5) * window.innerWidth;
+      const y = (-tempVector.y * 0.5 + 0.5) * window.innerHeight;
+      if (x < 80 || x > window.innerWidth - 80 || y < 90 || y > window.innerHeight - 70) {
+        pinTooltip.classList.remove('visible');
+        return;
+      }
+      pinTooltip.classList.add('visible');
+      pinTooltip.style.left = `${x}px`;
+      pinTooltip.style.top = `${y}px`;
+    }
+
+    function flyToSpot(spot) {
+      if (!spot) return;
+      const [x, z] = project(spot.lon, spot.lat);
+      const ground = groundHeightForPoint(x, z);
+      const target = new THREE.Vector3(x, ground + 2.7, z);
+      const offset = spot.id === 'taiwu'
+        ? new THREE.Vector3(13, 19, 20)
+        : new THREE.Vector3(10, 17, 19);
+      const endCamera = target.clone().add(offset);
+
+      gsap.killTweensOf(camera.position);
+      gsap.killTweensOf(controls.target);
+      controls.enabled = false;
+      pinTooltip.classList.remove('visible');
+
+      gsap.to(camera.position, {
+        x: endCamera.x, y: endCamera.y, z: endCamera.z,
+        duration: prefersReducedMotion ? 0.01 : 1.85,
+        ease: 'power3.inOut'
+      });
+      gsap.to(controls.target, {
+        x: target.x, y: target.y, z: target.z,
+        duration: prefersReducedMotion ? 0.01 : 1.85,
+        ease: 'power3.inOut',
+        onUpdate: () => controls.update(),
+        onComplete: () => { controls.enabled = true; }
+      });
+    }
+
+    function resetView() {
+      closeInfoPanel();
+      gsap.killTweensOf(camera.position);
+      gsap.killTweensOf(controls.target);
+      controls.enabled = false;
+      gsap.to(camera.position, {
+        x: 0, y: 74, z: 83,
+        duration: prefersReducedMotion ? 0.01 : 1.55,
+        ease: 'power3.inOut'
+      });
+      gsap.to(controls.target, {
+        x: 0, y: 2.6, z: -1.5,
+        duration: prefersReducedMotion ? 0.01 : 1.55,
+        ease: 'power3.inOut',
+        onUpdate: () => controls.update(),
+        onComplete: () => { controls.enabled = true; }
+      });
+    }
+
+    function selectSpot(spot, options = {}) {
+      if (!spot) return;
+      if (addMode) stopAddMode();
+      selectedSpotId = spot.id;
+      if (options.open !== false) openInfoPanel(spot);
+      if (options.fly !== false) flyToSpot(spot);
+      setHoveredPin(null);
+    }
+
+    function selectSpotById(id, options = {}) {
+      const spot = allSpots.find((item) => item.id === id);
+      if (spot) selectSpot(spot, options);
+    }
+
+    function updateSpotDock() {
+      const list = $('#spotList');
+      list.textContent = '';
+      allSpots.forEach((spot, index) => {
+        const row = document.createElement('button');
+        row.type = 'button';
+        row.className = 'spot-row';
+        row.dataset.spotId = spot.id;
+        row.dataset.custom = spot.custom ? 'true' : 'false';
+
+        const indexEl = document.createElement('span');
+        indexEl.className = 'spot-index mono';
+        indexEl.textContent = spot.custom ? 'C' + pad2(index - PRESET_SPOTS.length + 1) : pad2(index + 1);
+
+        const nameWrap = document.createElement('span');
+        nameWrap.className = 'spot-name';
+        const strong = document.createElement('strong');
+        strong.textContent = spot.name;
+        const small = document.createElement('small');
+        small.textContent = spot.custom ? 'CUSTOM LIGHT TRACE' : spot.en;
+        nameWrap.appendChild(strong);
+        nameWrap.appendChild(small);
+
+        const dot = document.createElement('span');
+        dot.className = 'spot-pin-dot';
+
+        row.appendChild(indexEl);
+        row.appendChild(nameWrap);
+        row.appendChild(dot);
+        row.addEventListener('click', () => selectSpot(spot));
+        list.appendChild(row);
+      });
+
+      $('#siteCount').textContent = `${pad2(allSpots.length)} SITES`;
+      $('#customCount').textContent = `${pad2(customSpots.length)} CUSTOM`;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Event wiring                                                        */
+    /* ------------------------------------------------------------------ */
+    function bindEvents() {
+      renderer.domElement.addEventListener('pointerdown', (event) => {
+        pointerDown = { x: event.clientX, y: event.clientY, button: event.button, time: performance.now() };
+      });
+
+      renderer.domElement.addEventListener('pointerup', (event) => {
+        if (!pointerDown || pointerDown.button !== 0) {
+          pointerDown = null;
+          return;
+        }
+        const distance = Math.hypot(event.clientX - pointerDown.x, event.clientY - pointerDown.y);
+        const elapsed = performance.now() - pointerDown.time;
+        pointerDown = null;
+        if (distance > 7 || elapsed > 800) return;
+
+        if (addMode) {
+          placeDraftFromPointer(event);
+          return;
+        }
+
+        const pin = pickPin(event);
+        if (pin) {
+          selectSpot(pin.data);
+        } else {
+          const mapHit = pickMap(event);
+          if (!mapHit && !infoPanel.classList.contains('open')) return;
+          closeInfoPanel();
+        }
+      });
+
+      renderer.domElement.addEventListener('pointermove', (event) => {
+        if (event.buttons !== 0 || isDragging) {
+          pinTooltip.classList.remove('visible');
+          return;
+        }
+        if (addMode) {
+          pinTooltip.classList.remove('visible');
+          return;
+        }
+        const pin = pickPin(event);
+        setHoveredPin(pin);
+        renderer.domElement.style.cursor = pin ? 'pointer' : 'grab';
+
+        const now = performance.now();
+        if (now - lastPointerCheck > 42) {
+          lastPointerCheck = now;
+          const hit = pickMap(event);
+          if (hit) {
+            const coords = unproject(hit.point.x, hit.point.z);
+            $('#coordReadout').textContent = formatCoords(coords.lat, coords.lon).replace(' / ', ' / ');
+          }
+        }
+      });
+
+      renderer.domElement.addEventListener('pointerleave', () => {
+        setHoveredPin(null);
+        renderer.domElement.style.cursor = addMode ? 'crosshair' : 'grab';
+      });
+
+      controls.addEventListener('start', () => {
+        isDragging = true;
+        pinTooltip.classList.remove('visible');
+        setHoveredPin(null);
+      });
+      controls.addEventListener('end', () => {
+        window.setTimeout(() => { isDragging = false; }, 30);
+      });
+
+      $('#resetViewBtn').addEventListener('click', resetView);
+      $('#closePanelBtn').addEventListener('click', closeInfoPanel);
+      addTrailBtn.addEventListener('click', () => {
+        if (addMode) stopAddMode();
+        else startAddMode();
+      });
+      $('#cancelAddMode').addEventListener('click', stopAddMode);
+      $('#closeModalBtn').addEventListener('click', cancelComposer);
+      $('#modalCancelBtn').addEventListener('click', cancelComposer);
+      addModal.addEventListener('click', (event) => {
+        if (event.target === addModal) cancelComposer();
+      });
+      saveSpotBtn.addEventListener('click', saveCustomSpot);
+
+      dropZone.addEventListener('click', () => photoInput.click());
+      dropZone.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          photoInput.click();
+        }
+      });
+      photoInput.addEventListener('change', () => {
+        if (photoInput.files && photoInput.files[0]) handlePhotoFile(photoInput.files[0]);
+      });
+      ['dragenter', 'dragover'].forEach((eventName) => {
+        dropZone.addEventListener(eventName, (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          dropZone.classList.add('dragover');
+        });
+      });
+      ['dragleave', 'drop'].forEach((eventName) => {
+        dropZone.addEventListener(eventName, (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          dropZone.classList.remove('dragover');
+        });
+      });
+      dropZone.addEventListener('drop', (event) => {
+        const file = event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files[0];
+        if (file) handlePhotoFile(file);
+      });
+
+      document.addEventListener('keydown', (event) => {
+        if (event.key !== 'Escape') return;
+        if (addModal.classList.contains('active')) cancelComposer();
+        else if (addMode) stopAddMode();
+        else closeInfoPanel();
+      });
+
+      $('#spotList').addEventListener('click', () => {});
+      updateClock();
+      window.setInterval(updateClock, 1000);
+    }
+
+    function updateClock() {
+      const now = new Date();
+      const clockEl = $('#clockReadout');
+      if (clockEl) clockEl.textContent = `${formatDate(now)} · ${formatTimeSeconds(now)}`;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Info panel and simulated dark-sky observation                       */
+    /* ------------------------------------------------------------------ */
+    function getMoonInfo(date = new Date()) {
+      const synodic = 29.530588853;
+      const knownNewMoon = Date.UTC(2000, 0, 6, 18, 14);
+      const days = ((date.getTime() - knownNewMoon) / 86400000) % synodic;
+      const phase = ((days < 0 ? days + synodic : days) / synodic);
+      const illumination = Math.round(((1 - Math.cos(2 * Math.PI * phase)) / 2) * 100);
+      let name = '新月';
+      if (phase >= 0.03 && phase < 0.22) name = '眉月';
+      else if (phase >= 0.22 && phase < 0.28) name = '上弦月';
+      else if (phase >= 0.28 && phase < 0.47) name = '盈凸月';
+      else if (phase >= 0.47 && phase < 0.53) name = '滿月';
+      else if (phase >= 0.53 && phase < 0.72) name = '虧凸月';
+      else if (phase >= 0.72 && phase < 0.78) name = '下弦月';
+      else if (phase >= 0.78 && phase < 0.97) name = '殘月';
+      return { phase, illumination, name };
+    }
+
+    function estimateBortle(spot) {
+      if (spot.bortle) return spot.bortle;
+      const [x, z] = project(spot.lon, spot.lat);
+      const urbanCentres = [
+        project(118.319, 24.432),
+        project(118.414, 24.435),
+        project(118.424, 24.492),
+        project(118.242, 24.429)
+      ];
+      let minDistance = Infinity;
+      urbanCentres.forEach(([ux, uz]) => {
+        minDistance = Math.min(minDistance, Math.hypot(x - ux, z - uz));
+      });
+      return clamp(Math.round(6.4 - minDistance * 0.11), 2, 7);
+    }
+
+    function observationFor(spot) {
+      const today = formatDate();
+      const seed = hashCode(`${spot.id}-${today}`);
+      const random = mulberry32(seed);
+      const baseCloud = typeof spot.cloud === 'number' ? spot.cloud : 8 + random() * 35;
+      const cloud = clamp(Math.round(baseCloud + (random() - 0.5) * 6), 0, 100);
+      const bortle = estimateBortle(spot);
+      const moon = getMoonInfo();
+      const score = clamp(Math.round(100 - cloud * 0.34 - Math.max(0, bortle - 1) * 2.8 - moon.illumination * 0.09), 32, 99);
+      const verdict = score >= 85 ? '極佳' : score >= 71 ? '良好' : score >= 56 ? '普通' : '較差';
+      const color = score >= 80 ? '#63f5df' : score >= 62 ? '#f6b86b' : '#e58a70';
+      return { cloud, bortle, moon, score, verdict, color };
+    }
+
+    function renderObservation(spot) {
+      const obs = observationFor(spot);
+      const ring = $('#scoreRing');
+      ring.style.setProperty('--score-angle', `${obs.score * 3.6}deg`);
+      ring.style.setProperty('--score-color', obs.color);
+      $('#scoreValue').textContent = String(obs.score);
+      $('#cloudValue').textContent = `${obs.cloud}%`;
+      $('#cloudBar').style.width = `${obs.cloud}%`;
+      $('#moonValue').textContent = `${obs.moon.illumination}%`;
+      $('#moonBar').style.width = `${Math.max(4, obs.moon.illumination)}%`;
+      $('#bortleValue').textContent = `B${obs.bortle}`;
+      $('#obsVerdict').textContent = `觀星條件 · ${obs.verdict} · ${obs.moon.name}`;
+      $('#obsUpdated').textContent = formatTime(new Date());
+
+      const scale = $('#bortleScale');
+      scale.textContent = '';
+      for (let i = 1; i <= 9; i += 1) {
+        const segment = document.createElement('i');
+        if (i <= obs.bortle) segment.className = 'on';
+        segment.title = `Bortle ${i}`;
+        scale.appendChild(segment);
+      }
+    }
+
+    function openInfoPanel(spot) {
+      if (!spot) return;
+      ensurePhoto(spot);
+      selectedSpotId = spot.id;
+
+      const index = allSpots.findIndex((item) => item.id === spot.id);
+      const code = spot.custom
+        ? `KM-C${pad2(Math.max(1, index - PRESET_SPOTS.length + 1))}`
+        : `KM-${pad2(index + 1)}`;
+
+      $('#panelCode').textContent = code;
+      $('#panelPhoto').src = spot.photo;
+      $('#panelPhoto').alt = `${spot.name} 拍攝預覽`;
+      $('#panelTheme').textContent = (spot.theme || 'CUSTOM').toUpperCase();
+      $('#panelGps').textContent = spot.gps
+        ? `GPS ${spot.gps.lat.toFixed(4)} / ${spot.gps.lon.toFixed(4)}`
+        : `MAP ${spot.lat.toFixed(4)} / ${spot.lon.toFixed(4)}`;
+      $('#panelPhotoTitle').textContent = spot.name;
+      $('#panelPhotoMeta').textContent = `${spot.date || '—'} · ${spot.time || '—'}`;
+      $('#panelTime').textContent = spot.time ? `${spot.time}:00` : '--:--:--';
+      $('#panelDistrict').textContent = spot.district || districtForSpot(spot);
+      $('#panelTag').textContent = spot.tag || '自訂觀測';
+      $('#panelTitle').textContent = spot.name;
+      $('#panelSubtitle').textContent = spot.en || 'CUSTOM LIGHT TRACE';
+      $('#panelShotMeta').textContent = spot.custom ? 'CUSTOM FRAME' : `FRAME ${pad2(index + 1)}`;
+      $('#exifCamera').textContent = spot.exif.camera || DEFAULT_EXIF.camera;
+      $('#exifLens').textContent = spot.exif.lens || '—';
+      $('#exifFocal').textContent = spot.exif.focal || DEFAULT_EXIF.focal;
+      $('#exifAperture').textContent = spot.exif.aperture || DEFAULT_EXIF.aperture;
+      $('#exifShutter').textContent = spot.exif.shutter || DEFAULT_EXIF.shutter;
+      $('#exifIso').textContent = spot.exif.iso || DEFAULT_EXIF.iso;
+      $('#panelStory').textContent = spot.story || '由觀測者親自新增的光影足跡。點擊地圖、上傳照片，讓這座島的夜色留下座標。';
+      $('#panelPhotoGps').textContent = spot.gps
+        ? `${spot.gps.lat.toFixed(5)}° N / ${spot.gps.lon.toFixed(5)}° E`
+        : 'NO GPS / LOCAL COORDINATE ONLY';
+
+      const deleteButton = $('#deleteSpotBtn');
+      deleteButton.style.display = spot.custom ? 'block' : 'none';
+      selectedDeleteHandler = spot.custom ? () => deleteCustomSpot(spot.id) : null;
+      deleteButton.onclick = () => {
+        if (selectedDeleteHandler) selectedDeleteHandler();
+      };
+
+      renderObservation(spot);
+      infoPanel.classList.add('open');
+      infoPanel.setAttribute('aria-hidden', 'false');
+      const scroller = infoPanel.querySelector('.panel-scroll');
+      if (scroller) scroller.scrollTop = 0;
+      pinTooltip.classList.remove('visible');
+    }
+
+    function closeInfoPanel() {
+      infoPanel.classList.remove('open');
+      infoPanel.setAttribute('aria-hidden', 'true');
+      selectedSpotId = null;
+      selectedDeleteHandler = null;
+    }
+
+    function districtForSpot(spot) {
+      if (spot.district) return spot.district;
+      const [x, z] = project(spot.lon, spot.lat);
+      const town = townWorld.find((item) => pointInRing(x, z, item.worldRing));
+      if (town) return `${town.name}${town.id === 'lieyu' ? '鄉' : '鎮'}`;
+      return '金門海域';
+    }
+
+    function deleteCustomSpot(id) {
+      const spot = customSpots.find((item) => item.id === id);
+      if (!spot) return;
+      if (!window.confirm(`確定要移除「${spot.name}」這個光影足跡嗎？`)) return;
+      customSpots = customSpots.filter((item) => item.id !== id);
+      const allIndex = allSpots.findIndex((item) => item.id === id);
+      if (allIndex >= 0) allSpots.splice(allIndex, 1);
+      removePin(id);
+      persistCustomSpots();
+      updateSpotDock();
+      closeInfoPanel();
+      showToast('已移除光影足跡');
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Add-trace flow + EXIF parsing                                       */
+    /* ------------------------------------------------------------------ */
+    let pendingDateTime = { date: formatDate(), time: formatTime() };
+    let toastTimer = null;
+
+    function showToast(message, duration = 2800) {
+      const text = $('#toastText');
+      text.textContent = message;
+      toast.classList.add('show');
+      window.clearTimeout(toastTimer);
+      toastTimer = window.setTimeout(() => toast.classList.remove('show'), duration);
+    }
+
+    function startAddMode() {
+      if (addModal.classList.contains('active')) return;
+      closeInfoPanel();
+      clearDraftPin();
+      addMode = true;
+      document.body.classList.add('adding');
+      addBanner.classList.add('active');
+      addTrailBtn.classList.add('active');
+      const label = addTrailBtn.querySelector('.btn-label');
+      if (label) label.textContent = '取消新增';
+      showToast('點擊島嶼地形放置光點，ESC 可取消', 2600);
+    }
+
+    function stopAddMode() {
+      addMode = false;
+      document.body.classList.remove('adding');
+      addBanner.classList.remove('active');
+      addTrailBtn.classList.remove('active');
+      const label = addTrailBtn.querySelector('.btn-label');
+      if (label) label.textContent = '新增光影足跡';
+      renderer.domElement.style.cursor = 'grab';
+    }
+
+    function placeDraftFromPointer(event) {
+      const hit = pickMap(event);
+      if (!hit) {
+        showToast('請點擊金門島嶼或烈嶼的陸地範圍');
+        return;
+      }
+      const x = hit.point.x;
+      const z = hit.point.z;
+      const coords = unproject(x, z);
+      const isIslet = hit.object && hit.object.userData.isIslet;
+      if (!isIslet && !insideLand(x, z)) {
+        showToast('請點擊島嶼陸地，勿在海面放置足跡');
+        return;
+      }
+
+      draftLocation = {
+        x,
+        z,
+        lon: coords.lon,
+        lat: coords.lat,
+        ground: isIslet ? 0.62 : groundHeightForPoint(x, z)
+      };
+      stopAddMode();
+      createDraftPin(x, z, draftLocation.ground);
+      openComposer();
+    }
+
+    function openComposer() {
+      if (!draftLocation) return;
+      pendingPhoto = null;
+      pendingGps = null;
+      pendingExif = { ...DEFAULT_EXIF };
+      isParsingPhoto = false;
+      const now = new Date();
+      pendingDateTime = { date: formatDate(now), time: formatTime(now) };
+
+      const district = getDistrictName(draftLocation.x, draftLocation.z);
+      $('#modalCoords').textContent = formatCoords(draftLocation.lat, draftLocation.lon);
+      $('#modalDistrict').textContent = district;
+      spotNameInput.value = `${district.replace(/[鄉鎮]$/, '')} · 光影足跡`;
+      photoInput.value = '';
+      $('#modalPreview').hidden = true;
+      $('#modalPreview').removeAttribute('src');
+      $('#previewShade').hidden = true;
+      $('#previewBadge').hidden = true;
+      $('#dropPrompt').style.display = 'flex';
+      exifStatus.textContent = '等待照片；若無 EXIF 將自動套用夜拍預設參數。';
+      exifStatus.className = 'exif-status mono';
+      renderModalExifChips(DEFAULT_EXIF, null, false);
+      saveSpotBtn.disabled = false;
+      saveSpotBtn.style.opacity = '1';
+      addModal.classList.add('active');
+      addModal.setAttribute('aria-hidden', 'false');
+      window.setTimeout(() => spotNameInput.focus({ preventScroll: true }), 300);
+    }
+
+    function cancelComposer() {
+      if (isParsingPhoto) {
+        showToast('照片解析中，請稍候');
+        return;
+      }
+      addModal.classList.remove('active');
+      addModal.setAttribute('aria-hidden', 'true');
+      clearDraftPin();
+      draftLocation = null;
+      pendingPhoto = null;
+      pendingGps = null;
+      pendingExif = { ...DEFAULT_EXIF };
+      pendingDateTime = { date: formatDate(), time: formatTime() };
+    }
+
+    function renderModalExifChips(exif, gps, fromPhoto) {
+      modalExifChips.textContent = '';
+      const values = [
+        exif.camera,
+        exif.focal,
+        exif.aperture,
+        exif.shutter,
+        exif.iso
+      ].filter(Boolean);
+      values.forEach((value) => {
+        const chip = document.createElement('span');
+        chip.className = 'modal-exif-chip';
+        chip.textContent = value;
+        modalExifChips.appendChild(chip);
+      });
+      if (gps) {
+        const gpsChip = document.createElement('span');
+        gpsChip.className = 'modal-exif-chip';
+        gpsChip.textContent = `GPS ${gps.lat.toFixed(4)}, ${gps.lon.toFixed(4)}`;
+        gpsChip.style.color = 'rgba(246,184,107,.82)';
+        modalExifChips.appendChild(gpsChip);
+      }
+      if (!fromPhoto) {
+        const noteChip = document.createElement('span');
+        noteChip.className = 'modal-exif-chip';
+        noteChip.textContent = 'FALLBACK PROFILE';
+        modalExifChips.appendChild(noteChip);
+      }
+    }
+
+    async function handlePhotoFile(file) {
+      if (!file || !file.type.startsWith('image/')) {
+        showToast('請上傳 JPG、PNG 等圖片檔案');
+        return;
+      }
+      if (isParsingPhoto) return;
+      isParsingPhoto = true;
+      saveSpotBtn.disabled = true;
+      saveSpotBtn.style.opacity = '0.55';
+      exifStatus.textContent = '正在讀取影像與 EXIF 拍攝參數…';
+      exifStatus.className = 'exif-status mono';
+
+      try {
+        const [compressedResult, tagsResult] = await Promise.allSettled([
+          compressImageFile(file),
+          readExifTags(file)
+        ]);
+
+        if (compressedResult.status === 'fulfilled') {
+          pendingPhoto = compressedResult.value;
+          const preview = $('#modalPreview');
+          preview.src = pendingPhoto;
+          preview.hidden = false;
+          $('#previewShade').hidden = false;
+          $('#previewBadge').hidden = false;
+          $('#previewBadge').textContent = 'PHOTO READY / CLICK TO REPLACE';
+          $('#dropPrompt').style.display = 'none';
+        } else {
+          throw new Error('影像讀取失敗');
+        }
+
+        const tags = tagsResult.status === 'fulfilled' ? tagsResult.value : null;
+        const parsed = parsePhotoMetadata(tags);
+        pendingExif = parsed.exif;
+        pendingGps = parsed.gps;
+        if (parsed.datetime) pendingDateTime = parsed.datetime;
+        renderModalExifChips(pendingExif, pendingGps, parsed.hasExif);
+
+        if (parsed.hasExif) {
+          exifStatus.textContent = `EXIF READ OK · ${pendingExif.camera}${pendingGps ? ' · GPS FOUND' : ' · NO GPS'}`;
+          exifStatus.className = 'exif-status mono ok';
+        } else {
+          exifStatus.textContent = '未偵測到可用 EXIF，已套用預設夜拍參數。';
+          exifStatus.className = 'exif-status mono warn';
+        }
+        if (parsed.datetime) {
+          showToast(`照片時間：${parsed.datetime.date} ${parsed.datetime.time}`, 2200);
+        }
+      } catch (error) {
+        pendingPhoto = null;
+        $('#modalPreview').hidden = true;
+        $('#previewShade').hidden = true;
+        $('#previewBadge').hidden = true;
+        $('#dropPrompt').style.display = 'flex';
+        exifStatus.textContent = '無法讀取此照片，請改用 JPG / PNG 檔案。';
+        exifStatus.className = 'exif-status mono warn';
+        showToast('照片讀取失敗');
+      } finally {
+        isParsingPhoto = false;
+        saveSpotBtn.disabled = false;
+        saveSpotBtn.style.opacity = '1';
+      }
+    }
+
+    function compressImageFile(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error('FileReader failed'));
+        reader.onload = () => {
+          const image = new Image();
+          image.onerror = () => reject(new Error('Image decode failed'));
+          image.onload = () => {
+            const maxSide = 1500;
+            const ratio = Math.min(1, maxSide / Math.max(image.width, image.height));
+            const width = Math.max(1, Math.round(image.width * ratio));
+            const height = Math.max(1, Math.round(image.height * ratio));
+            const surface = document.createElement('canvas');
+            surface.width = width;
+            surface.height = height;
+            const ctx = surface.getContext('2d');
+            ctx.fillStyle = '#061017';
+            ctx.fillRect(0, 0, width, height);
+            ctx.drawImage(image, 0, 0, width, height);
+            resolve(surface.toDataURL('image/jpeg', 0.82));
+          };
+          image.src = reader.result;
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function readExifTags(file) {
+      return new Promise((resolve) => {
+        if (!window.EXIF) {
+          resolve(null);
+          return;
+        }
+        let settled = false;
+        const timer = window.setTimeout(() => {
+          if (settled) return;
+          settled = true;
+          resolve(null);
+        }, 4500);
+        try {
+          window.EXIF.getData(file, function onExif() {
+            if (settled) return;
+            settled = true;
+            window.clearTimeout(timer);
+            try {
+              resolve(window.EXIF.getAllTags(this) || {});
+            } catch (error) {
+              resolve(null);
+            }
+          });
+        } catch (error) {
+          settled = true;
+          window.clearTimeout(timer);
+          resolve(null);
+        }
+      });
+    }
+
+    function toNumeric(value) {
+      if (value === null || value === undefined || value === '') return null;
+      if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+      if (Array.isArray(value)) return toNumeric(value[0]);
+      if (typeof value === 'object') {
+        if (typeof value.numerator === 'number' && typeof value.denominator === 'number') {
+          return value.denominator ? value.numerator / value.denominator : null;
+        }
+        if (typeof value.valueOf === 'function') {
+          const numeric = Number(value.valueOf());
+          return Number.isFinite(numeric) ? numeric : null;
+        }
+      }
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : null;
+    }
+
+    function formatFNumber(value) {
+      const numeric = toNumeric(value);
+      if (!numeric) return null;
+      return `F${numeric.toFixed(numeric >= 10 ? 0 : 1).replace(/\.0$/, '')}`;
+    }
+
+    function formatExposure(value) {
+      const numeric = toNumeric(value);
+      if (!numeric) return null;
+      if (numeric < 1) return `1/${Math.max(1, Math.round(1 / numeric))} s`;
+      if (numeric < 10) return `${numeric.toFixed(1)} s`;
+      return `${Math.round(numeric)} s`;
+    }
+
+    function formatFocal(value) {
+      const numeric = toNumeric(value);
+      if (!numeric) return null;
+      return `${Math.round(numeric)} mm`;
+    }
+
+    function formatIso(value) {
+      const numeric = toNumeric(value);
+      if (!numeric) return null;
+      return `ISO ${Math.round(numeric)}`;
+    }
+
+    function parseGps(tags) {
+      if (!tags) return null;
+      const latArray = tags.GPSLatitude;
+      const lonArray = tags.GPSLongitude;
+      if (!Array.isArray(latArray) || !Array.isArray(lonArray)) return null;
+      const toDms = (values) => {
+        const parts = values.map(toNumeric);
+        if (parts.some((part) => part === null)) return null;
+        return parts[0] + (parts[1] || 0) / 60 + (parts[2] || 0) / 3600;
+      };
+      let lat = toDms(latArray);
+      let lon = toDms(lonArray);
+      if (lat === null || lon === null) return null;
+      const latRef = String(tags.GPSLatitudeRef || 'N').toUpperCase().charAt(0);
+      const lonRef = String(tags.GPSLongitudeRef || 'E').toUpperCase().charAt(0);
+      if (latRef === 'S') lat = -lat;
+      if (lonRef === 'W') lon = -lon;
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+      if (Math.abs(lat) > 90 || Math.abs(lon) > 180) return null;
+      return { lat, lon };
+    }
+
+    function parseExifDateTime(value) {
+      if (!value) return null;
+      const text = String(value);
+      const match = text.match(/(\d{4})[:\-/](\d{2})[:\-/](\d{2})[ T](\d{2}):(\d{2})/);
+      if (!match) return null;
+      return {
+        date: `${match[1]}.${match[2]}.${match[3]}`,
+        time: `${match[4]}:${match[5]}`
+      };
+    }
+
+    function parsePhotoMetadata(tags) {
+      if (!tags) {
+        return { exif: { ...DEFAULT_EXIF }, gps: null, datetime: null, hasExif: false };
+      }
+      const make = tags.Make ? String(tags.Make).trim() : '';
+      const model = tags.Model ? String(tags.Model).trim() : '';
+      let camera = model || make;
+      if (make && model && !model.toLowerCase().includes(make.split(' ')[0].toLowerCase())) {
+        camera = `${make} ${model}`;
+      }
+      if (!camera) camera = DEFAULT_EXIF.camera;
+      camera = camera.replace(/\s+/g, ' ').trim();
+
+      const lens = tags.LensModel || tags.LensInfo || tags.Lens || DEFAULT_EXIF.lens;
+      const focal = formatFocal(tags.FocalLength) || formatFocal(tags.FocalLengthIn35mmFilm) || DEFAULT_EXIF.focal;
+      const aperture = formatFNumber(tags.FNumber) || formatFNumber(tags.ApertureValue) || DEFAULT_EXIF.aperture;
+      const shutter = formatExposure(tags.ExposureTime) || formatExposure(tags.ShutterSpeedValue) || DEFAULT_EXIF.shutter;
+      const iso = formatIso(tags.ISOSpeedRatings || tags.PhotographicSensitivity || tags.ISO) || DEFAULT_EXIF.iso;
+      const gps = parseGps(tags);
+      const datetime = parseExifDateTime(tags.DateTimeOriginal || tags.CreateDate || tags.DateTime);
+      const hasExif = Boolean(tags.Make || tags.Model || tags.FNumber || tags.ExposureTime || tags.ISOSpeedRatings || tags.FocalLength || gps);
+
+      return {
+        exif: {
+          camera: String(camera).slice(0, 48),
+          lens: String(lens).slice(0, 52),
+          focal,
+          aperture,
+          shutter,
+          iso
+        },
+        gps,
+        datetime,
+        hasExif
+      };
+    }
+
+    function getDistrictName(x, z) {
+      const town = townWorld.find((item) => pointInRing(x, z, item.worldRing));
+      if (!town) return '金門海域';
+      if (town.id === 'lieyu') return '烈嶼鄉';
+      return `${town.name}鎮`;
+    }
+
+    function saveCustomSpot() {
+      if (isParsingPhoto) {
+        showToast('照片解析中，請稍候');
+        return;
+      }
+      if (!draftLocation) {
+        showToast('尚未選擇座標，請重新點擊地圖');
+        return;
+      }
+      const name = (spotNameInput.value || '').trim().slice(0, 32) || '自訂光影足跡';
+      const district = getDistrictName(draftLocation.x, draftLocation.z);
+      const spot = {
+        id: `custom-${Date.now()}-${Math.floor(Math.random() * 9999)}`,
+        custom: true,
+        name,
+        en: 'CUSTOM LIGHT TRACE',
+        district,
+        lon: draftLocation.lon,
+        lat: draftLocation.lat,
+        color: 0xf6b86b,
+        theme: 'custom',
+        tag: '自訂足跡',
+        date: pendingDateTime.date,
+        time: pendingDateTime.time,
+        exif: { ...pendingExif },
+        gps: pendingGps,
+        photo: pendingPhoto,
+        bortle: estimateBortle({ lon: draftLocation.lon, lat: draftLocation.lat }),
+        story: `由觀測者於 ${pendingDateTime.date} ${pendingDateTime.time} 新增的光影足跡，使用 ${pendingExif.camera} 記錄這片金門夜色。`
+      };
+
+      customSpots.push(spot);
+      allSpots.push(spot);
+      createPin(spot, allSpots.length - 1);
+      updateSpotDock();
+      persistCustomSpots();
+      addModal.classList.remove('active');
+      addModal.setAttribute('aria-hidden', 'true');
+      clearDraftPin();
+      draftLocation = null;
+      pendingPhoto = null;
+      pendingGps = null;
+      pendingExif = { ...DEFAULT_EXIF };
+      showToast(`已儲存「${name}」光影足跡`);
+      selectSpot(spot);
+    }
+
+    function persistCustomSpots() {
+      const serialize = (includePhotos) => customSpots.map((spot) => ({
+        id: spot.id,
+        custom: true,
+        name: spot.name,
+        en: spot.en,
+        district: spot.district,
+        lon: spot.lon,
+        lat: spot.lat,
+        color: spot.color,
+        theme: spot.theme,
+        tag: spot.tag,
+        date: spot.date,
+        time: spot.time,
+        exif: spot.exif,
+        gps: spot.gps,
+        photo: includePhotos ? spot.photo : null,
+        bortle: spot.bortle,
+        story: spot.story
+      }));
+
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(serialize(true)));
+        return true;
+      } catch (error) {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(serialize(false)));
+          showToast('照片資料過大，點位已儲存但照片未保留', 3800);
+          return true;
+        } catch (fallbackError) {
+          showToast('此瀏覽器無法使用 LocalStorage，重新整理後資料可能消失', 4200);
+          return false;
+        }
+      }
+    }
+
+    function loadStoredSpots() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) return;
+        customSpots = parsed
+          .filter((item) => item && typeof item.lon === 'number' && typeof item.lat === 'number')
+          .map((item, index) => ({
+            id: String(item.id || `custom-restored-${index}`),
+            custom: true,
+            name: String(item.name || '自訂光影足跡').slice(0, 32),
+            en: 'CUSTOM LIGHT TRACE',
+            district: String(item.district || '金門'),
+            lon: Number(item.lon),
+            lat: Number(item.lat),
+            color: 0xf6b86b,
+            theme: 'custom',
+            tag: String(item.tag || '自訂足跡'),
+            date: String(item.date || formatDate()),
+            time: String(item.time || formatTime()),
+            exif: { ...DEFAULT_EXIF, ...(item.exif || {}) },
+            gps: item.gps && typeof item.gps.lat === 'number' && typeof item.gps.lon === 'number' ? item.gps : null,
+            photo: typeof item.photo === 'string' && item.photo.startsWith('data:image/') ? item.photo : null,
+            bortle: Number(item.bortle) || 4,
+            story: String(item.story || '由觀測者儲存於本機的光影足跡。')
+          }));
+      } catch (error) {
+        customSpots = [];
+      }
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Procedural photo previews                                           */
+    /* ------------------------------------------------------------------ */
+    function ensurePhoto(spot) {
+      if (!spot.photo) {
+        spot.photo = createScenePhoto(spot);
+      }
+      return spot.photo;
+    }
+
+    function createScenePhoto(spot) {
+      const W = 1280;
+      const H = 760;
+      const horizon = H * 0.61;
+      const theme = spot.theme || 'custom';
+      const random = mulberry32(hashCode(`${spot.id}-${spot.name}-${theme}`));
+      const surface = document.createElement('canvas');
+      surface.width = W;
+      surface.height = H;
+      const ctx = surface.getContext('2d');
+
+      const palettes = {
+        sunrise: [[0, '#030912'], [0.34, '#0b1d29'], [0.65, '#403c46'], [0.84, '#bb7358'], [1, '#f2b273']],
+        sunset: [[0, '#04050d'], [0.32, '#15162c'], [0.58, '#442847'], [0.8, '#9c5359'], [1, '#e9a068']],
+        mountain: [[0, '#01040a'], [0.36, '#04121f'], [0.67, '#082334'], [1, '#0f3d41']],
+        tide: [[0, '#020812'], [0.4, '#07182c'], [0.67, '#0b2d42'], [1, '#246a70']],
+        street: [[0, '#02050b'], [0.45, '#06101c'], [0.7, '#10232e'], [1, '#293b3a']],
+        custom: [[0, '#02060b'], [0.42, '#04131c'], [0.7, '#082a34'], [1, '#0d4a47']]
+      };
+
+      const sky = ctx.createLinearGradient(0, 0, 0, horizon + 30);
+      (palettes[theme] || palettes.custom).forEach(([stop, color]) => sky.addColorStop(stop, color));
+      ctx.fillStyle = sky;
+      ctx.fillRect(0, 0, W, horizon + 30);
+
+      function glow(x, y, radius, inner, middle, outer) {
+        const gradient = ctx.createRadialGradient(x, y, 0, x, y, radius);
+        gradient.addColorStop(0, inner);
+        gradient.addColorStop(0.28, middle);
+        gradient.addColorStop(1, outer);
+        ctx.fillStyle = gradient;
+        ctx.fillRect(x - radius, y - radius, radius * 2, radius * 2);
+      }
+
+      function drawStars(count, maxY, alpha = 0.9) {
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        for (let i = 0; i < count; i += 1) {
+          const x = random() * W;
+          const y = random() * maxY;
+          const radius = 0.35 + Math.pow(random(), 3) * 2.1;
+          const twinkle = (0.3 + random() * 0.7) * alpha;
+          ctx.fillStyle = random() > 0.86 ? `rgba(255,225,180,${twinkle})` : `rgba(205,245,255,${twinkle})`;
+          ctx.beginPath();
+          ctx.arc(x, y, radius, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
+      }
+
+      function drawClouds(count, color, yBase, alpha) {
+        ctx.save();
+        for (let i = 0; i < count; i += 1) {
+          const x = random() * W;
+          const y = yBase - random() * 120;
+          const width = 150 + random() * 360;
+          const height = 8 + random() * 20;
+          const cloud = ctx.createLinearGradient(x - width, y, x + width, y);
+          cloud.addColorStop(0, 'rgba(0,0,0,0)');
+          cloud.addColorStop(0.35, color.replace('ALPHA', String(alpha)));
+          cloud.addColorStop(0.65, color.replace('ALPHA', String(alpha * 0.75)));
+          cloud.addColorStop(1, 'rgba(0,0,0,0)');
+          ctx.fillStyle = cloud;
+          ctx.beginPath();
+          ctx.ellipse(x, y, width, height, 0, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
+      }
+
+      function drawMilkyWay(intensity) {
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        for (let i = 0; i < 950; i += 1) {
+          const x = random() * W;
+          const centre = 90 + x * 0.19;
+          const spread = (random() + random() + random() - 1.5) * 74;
+          const y = centre + spread;
+          const alpha = (0.05 + random() * 0.18) * intensity;
+          ctx.fillStyle = random() > 0.9 ? `rgba(246,184,107,${alpha})` : `rgba(160,224,233,${alpha})`;
+          ctx.beginPath();
+          ctx.arc(x, y, 0.35 + random() * 1.1, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
+      }
+
+      function drawRidge(baseY, amplitude, color, phase, roughness = 0.3) {
+        ctx.beginPath();
+        ctx.moveTo(0, H);
+        ctx.lineTo(0, baseY);
+        for (let x = 0; x <= W; x += 18) {
+          const wave = (Math.sin(x * 0.0045 + phase) * 0.5 + 0.5) * amplitude;
+          const detail = (Math.sin(x * 0.019 + phase * 3) * 0.5 + 0.5) * amplitude * roughness;
+          ctx.lineTo(x, baseY - wave - detail);
+        }
+        ctx.lineTo(W, H);
+        ctx.closePath();
+        ctx.fillStyle = color;
+        ctx.fill();
+      }
+
+      function drawSea(isSunset, isSunrise) {
+        const sea = ctx.createLinearGradient(0, horizon, 0, H);
+        if (isSunrise) {
+          sea.addColorStop(0, '#8b5a4d');
+          sea.addColorStop(0.14, '#2d3d46');
+          sea.addColorStop(0.65, '#081a28');
+          sea.addColorStop(1, '#020912');
+        } else if (isSunset) {
+          sea.addColorStop(0, '#794953');
+          sea.addColorStop(0.15, '#282e42');
+          sea.addColorStop(0.7, '#091726');
+          sea.addColorStop(1, '#020812');
+        } else {
+          sea.addColorStop(0, '#1d5962');
+          sea.addColorStop(0.16, '#103441');
+          sea.addColorStop(0.7, '#04121f');
+          sea.addColorStop(1, '#01060b');
+        }
+        ctx.fillStyle = sea;
+        ctx.fillRect(0, horizon, W, H - horizon);
+
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        for (let i = 0; i < 190; i += 1) {
+          const y = horizon + Math.pow(random(), 1.6) * (H - horizon);
+          const x = (random() - 0.5) * W * 1.5 + W * 0.5;
+          const width = 8 + random() * 95;
+          const alpha = 0.02 + random() * 0.1;
+          ctx.strokeStyle = isSunrise || isSunset
+            ? `rgba(247,196,135,${alpha})`
+            : `rgba(141,235,229,${alpha})`;
+          ctx.lineWidth = 0.8 + random() * 1.5;
+          ctx.beginPath();
+          ctx.moveTo(x - width / 2, y);
+          ctx.lineTo(x + width / 2, y);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+
+      function drawReeds(baseY, count) {
+        ctx.save();
+        ctx.strokeStyle = 'rgba(3, 8, 10, 0.95)';
+        for (let i = 0; i < count; i += 1) {
+          const x = random() * W;
+          const height = 30 + random() * 130;
+          const lean = (random() - 0.5) * 45;
+          ctx.lineWidth = 1.2 + random() * 1.8;
+          ctx.beginPath();
+          ctx.moveTo(x, baseY + random() * 70);
+          ctx.quadraticCurveTo(x + lean * 0.3, baseY - height * 0.55, x + lean, baseY - height);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+
+      if (theme === 'sunrise') {
+        drawStars(650, horizon * 0.68, 0.64);
+        drawClouds(10, 'rgba(228,171,126,ALPHA)', horizon - 20, 0.18);
+        glow(W * 0.66, H * 0.53, 230, 'rgba(255,231,181,0.62)', 'rgba(239,152,85,0.22)', 'rgba(239,152,85,0)');
+        ctx.fillStyle = '#ffe3a7';
+        ctx.beginPath();
+        ctx.arc(W * 0.66, H * 0.53, 31, 0, Math.PI * 2);
+        ctx.fill();
+        drawSea(true, true);
+        ctx.fillStyle = 'rgba(2, 8, 11, 0.92)';
+        ctx.beginPath();
+        ctx.moveTo(0, H * 0.83);
+        ctx.bezierCurveTo(W * 0.22, H * 0.76, W * 0.5, H * 0.88, W, H * 0.8);
+        ctx.lineTo(W, H);
+        ctx.lineTo(0, H);
+        ctx.closePath();
+        ctx.fill();
+        drawReeds(H * 0.82, 55);
+      } else if (theme === 'sunset') {
+        drawStars(520, horizon * 0.55, 0.47);
+        drawClouds(9, 'rgba(240,160,120,ALPHA)', horizon - 70, 0.17);
+        glow(W * 0.38, H * 0.55, 245, 'rgba(255,214,157,0.55)', 'rgba(213,112,80,0.22)', 'rgba(213,112,80,0)');
+        ctx.fillStyle = '#ffd49a';
+        ctx.beginPath();
+        ctx.arc(W * 0.38, H * 0.55, 28, 0, Math.PI * 2);
+        ctx.fill();
+        drawSea(true, false);
+        const reflection = ctx.createLinearGradient(W * 0.38, horizon, W * 0.38, H);
+        reflection.addColorStop(0, 'rgba(255,196,122,0.32)');
+        reflection.addColorStop(1, 'rgba(255,196,122,0)');
+        ctx.fillStyle = reflection;
+        ctx.fillRect(W * 0.22, horizon, W * 0.32, H - horizon);
+        ctx.strokeStyle = 'rgba(1, 5, 8, 0.95)';
+        ctx.lineWidth = 8;
+        ctx.beginPath();
+        ctx.moveTo(W * 0.42, horizon + 5);
+        ctx.quadraticCurveTo(W * 0.43, horizon + 50, W * 0.5, horizon + 65);
+        ctx.stroke();
+        drawReeds(H * 0.9, 34);
+      } else if (theme === 'mountain') {
+        drawStars(2300, horizon * 0.9, 0.96);
+        drawMilkyWay(1.0);
+        drawClouds(5, 'rgba(109,187,190,ALPHA)', horizon - 60, 0.08);
+        glow(W * 0.75, H * 0.21, 105, 'rgba(230,252,249,0.34)', 'rgba(172,230,226,0.09)', 'rgba(172,230,226,0)');
+        ctx.fillStyle = '#e1f4ef';
+        ctx.beginPath();
+        ctx.arc(W * 0.75, H * 0.21, 23, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = 'rgba(102, 143, 143, 0.19)';
+        ctx.beginPath();
+        ctx.arc(W * 0.744, H * 0.207, 5, 0, Math.PI * 2);
+        ctx.arc(W * 0.759, H * 0.215, 3.3, 0, Math.PI * 2);
+        ctx.fill();
+        drawRidge(horizon + 20, 85, 'rgba(20, 55, 66, 0.72)', 1.4, 0.35);
+        drawRidge(horizon + 55, 125, 'rgba(11, 36, 46, 0.92)', 2.6, 0.42);
+        drawRidge(horizon + 105, 155, 'rgba(5, 22, 29, 0.98)', 4.1, 0.46);
+        drawRidge(horizon + 175, 190, 'rgba(2, 11, 16, 1)', 5.3, 0.5);
+        ctx.save();
+        ctx.strokeStyle = 'rgba(0, 5, 8, 0.92)';
+        ctx.lineWidth = 3;
+        const px = W * 0.39;
+        const py = H * 0.76;
+        ctx.beginPath();
+        ctx.arc(px, py - 27, 6, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(0,5,8,0.95)';
+        ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(px, py - 21);
+        ctx.lineTo(px, py + 8);
+        ctx.moveTo(px, py - 8);
+        ctx.lineTo(px - 24, py + 25);
+        ctx.moveTo(px, py - 8);
+        ctx.lineTo(px + 24, py + 25);
+        ctx.moveTo(px, py - 1);
+        ctx.lineTo(px - 9, py + 15);
+        ctx.moveTo(px, py - 1);
+        ctx.lineTo(px + 9, py + 15);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(px - 25, py - 35);
+        ctx.lineTo(px - 38, py - 45);
+        ctx.moveTo(px + 25, py - 35);
+        ctx.lineTo(px + 38, py - 45);
+        ctx.stroke();
+        ctx.restore();
+      } else if (theme === 'tide') {
+        drawStars(1300, horizon * 0.8, 0.8);
+        glow(W * 0.72, H * 0.23, 95, 'rgba(222,248,244,0.28)', 'rgba(120,211,210,0.08)', 'rgba(120,211,210,0)');
+        ctx.fillStyle = '#d6efec';
+        ctx.beginPath();
+        ctx.arc(W * 0.72, H * 0.23, 19, 0, Math.PI * 2);
+        ctx.fill();
+        drawSea(false, false);
+        const reflection = ctx.createLinearGradient(W * 0.72, horizon, W * 0.72, H);
+        reflection.addColorStop(0, 'rgba(173,240,234,0.24)');
+        reflection.addColorStop(1, 'rgba(173,240,234,0)');
+        ctx.fillStyle = reflection;
+        ctx.fillRect(W * 0.62, horizon, W * 0.2, H - horizon);
+        ctx.fillStyle = 'rgba(1, 8, 11, 0.98)';
+        ctx.beginPath();
+        ctx.moveTo(W * 0.75, horizon + 10);
+        ctx.quadraticCurveTo(W * 0.8, horizon + 3, W * 0.84, horizon + 18);
+        ctx.lineTo(W * 0.87, horizon + 35);
+        ctx.lineTo(W * 0.77, horizon + 36);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = 'rgba(7, 18, 21, 0.88)';
+        ctx.beginPath();
+        ctx.moveTo(0, H * 0.84);
+        ctx.bezierCurveTo(W * 0.25, H * 0.77, W * 0.55, H * 0.87, W, H * 0.82);
+        ctx.lineTo(W, H);
+        ctx.lineTo(0, H);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(109, 167, 163, 0.18)';
+        ctx.lineWidth = 2;
+        for (let i = 0; i < 34; i += 1) {
+          const x = W * 0.34 + random() * W * 0.44;
+          const y = H * 0.86 + random() * H * 0.12;
+          ctx.strokeRect(x, y, 5 + random() * 14, 2 + random() * 5);
+        }
+        drawReeds(H * 0.9, 22);
+      } else if (theme === 'street') {
+        drawStars(320, horizon * 0.45, 0.45);
+        const roadTop = horizon + 15;
+        const roadGradient = ctx.createLinearGradient(0, roadTop, 0, H);
+        roadGradient.addColorStop(0, '#111b20');
+        roadGradient.addColorStop(1, '#04090d');
+        ctx.fillStyle = roadGradient;
+        ctx.fillRect(0, roadTop, W, H - roadTop);
+
+        const leftGradient = ctx.createLinearGradient(0, 0, W * 0.42, 0);
+        leftGradient.addColorStop(0, 'rgba(3,7,10,0.99)');
+        leftGradient.addColorStop(1, 'rgba(3,7,10,0)');
+        ctx.fillStyle = leftGradient;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(W * 0.39, 0);
+        ctx.lineTo(W * 0.34, H * 0.66);
+        ctx.lineTo(0, H);
+        ctx.closePath();
+        ctx.fill();
+
+        const rightGradient = ctx.createLinearGradient(W, 0, W * 0.58, 0);
+        rightGradient.addColorStop(0, 'rgba(3,7,10,0.99)');
+        rightGradient.addColorStop(1, 'rgba(3,7,10,0)');
+        ctx.fillStyle = rightGradient;
+        ctx.beginPath();
+        ctx.moveTo(W, 0);
+        ctx.lineTo(W * 0.61, 0);
+        ctx.lineTo(W * 0.66, H * 0.66);
+        ctx.lineTo(W, H);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.strokeStyle = 'rgba(246,184,107,0.2)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(0, H);
+        ctx.lineTo(W * 0.5, roadTop);
+        ctx.moveTo(W, H);
+        ctx.lineTo(W * 0.5, roadTop);
+        ctx.stroke();
+
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        for (let side = 0; side < 2; side += 1) {
+          for (let row = 0; row < 4; row += 1) {
+            for (let column = 0; column < 8; column += 1) {
+              const x = side === 0
+                ? W * 0.06 + column * 33 + row * 8
+                : W * 0.94 - column * 33 - row * 8;
+              const y = H * 0.32 + row * 88 + column * 4;
+              const size = 3 + row * 0.8;
+              ctx.fillStyle = `rgba(246,184,107,${0.15 + random() * 0.35})`;
+              ctx.fillRect(x, y, size, size * 1.35);
+            }
+          }
+        }
+        ctx.restore();
+
+        [0.18, 0.36, 0.64, 0.82].forEach((x) => {
+          glow(W * x, H * 0.42, 95, 'rgba(246,184,107,0.32)', 'rgba(246,184,107,0.07)', 'rgba(246,184,107,0)');
+          ctx.fillStyle = 'rgba(255,221,166,0.85)';
+          ctx.beginPath();
+          ctx.arc(W * x, H * 0.42, 4.5, 0, Math.PI * 2);
+          ctx.fill();
+        });
+        ctx.fillStyle = 'rgba(255, 205, 142, 0.08)';
+        ctx.beginPath();
+        ctx.moveTo(W * 0.43, H);
+        ctx.lineTo(W * 0.5, roadTop);
+        ctx.lineTo(W * 0.57, H);
+        ctx.closePath();
+        ctx.fill();
+      } else {
+        drawStars(1800, horizon * 0.83, 0.86);
+        drawMilkyWay(0.72);
+        glow(W * 0.63, horizon - 28, 270, 'rgba(83,245,223,0.22)', 'rgba(33,142,136,0.08)', 'rgba(33,142,136,0)');
+        ctx.fillStyle = 'rgba(5,16,20,0.98)';
+        ctx.beginPath();
+        ctx.moveTo(0, H * 0.77);
+        ctx.bezierCurveTo(W * 0.3, H * 0.73, W * 0.45, H * 0.79, W * 0.66, H * 0.76);
+        ctx.bezierCurveTo(W * 0.8, H * 0.74, W * 0.92, H * 0.78, W, H * 0.75);
+        ctx.lineTo(W, H);
+        ctx.lineTo(0, H);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(140, 231, 217, 0.25)';
+        ctx.lineWidth = 2;
+        for (let i = 0; i < 4; i += 1) {
+          const x = W * 0.63 + i * 18;
+          const y = H * 0.56 - i * 10;
+          ctx.beginPath();
+          ctx.arc(x, y, 2 + i * 0.8, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+        drawReeds(H * 0.87, 24);
+      }
+
+      const mist = ctx.createLinearGradient(0, horizon - 48, 0, horizon + 60);
+      mist.addColorStop(0, 'rgba(180, 231, 222, 0)');
+      mist.addColorStop(0.48, theme === 'sunrise' || theme === 'sunset' ? 'rgba(255,205,157,0.09)' : 'rgba(105, 195, 190, 0.07)');
+      mist.addColorStop(1, 'rgba(180, 231, 222, 0)');
+      ctx.fillStyle = mist;
+      ctx.fillRect(0, horizon - 48, W, 108);
+
+      ctx.save();
+      for (let i = 0; i < 2600; i += 1) {
+        const x = random() * W;
+        const y = random() * H;
+        ctx.fillStyle = `rgba(255,255,255,${random() * 0.055})`;
+        ctx.fillRect(x, y, 1, 1);
+      }
+      ctx.restore();
+
+      const vignette = ctx.createRadialGradient(W * 0.5, H * 0.45, W * 0.18, W * 0.5, H * 0.5, W * 0.72);
+      vignette.addColorStop(0, 'rgba(0,0,0,0)');
+      vignette.addColorStop(0.72, 'rgba(0,3,6,0.18)');
+      vignette.addColorStop(1, 'rgba(0,2,5,0.72)');
+      ctx.fillStyle = vignette;
+      ctx.fillRect(0, 0, W, H);
+
+      const topShade = ctx.createLinearGradient(0, 0, 0, 150);
+      topShade.addColorStop(0, 'rgba(0,4,8,0.58)');
+      topShade.addColorStop(1, 'rgba(0,4,8,0)');
+      ctx.fillStyle = topShade;
+      ctx.fillRect(0, 0, W, 150);
+
+      return surface.toDataURL('image/jpeg', 0.9);
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Animation loop                                                      */
+    /* ------------------------------------------------------------------ */
+    function animate() {
+      requestAnimationFrame(animate);
+      const dt = Math.min(clock.getDelta(), 0.05);
+      const time = clock.elapsedTime;
+
+      if (starMaterial) starMaterial.uniforms.uTime.value = time;
+      if (gridMaterial) gridMaterial.uniforms.uTime.value = time;
+      if (starField) {
+        starField.rotation.y = time * 0.0032;
+        starField.rotation.z = Math.sin(time * 0.01) * 0.012;
+      }
+
+      glowMeshes.forEach((mesh) => {
+        const breathing = 1 + Math.sin(time * 0.38 + mesh.userData.phase) * 0.045;
+        mesh.scale.set(breathing, breathing, 1);
+        mesh.material.opacity = mesh.userData.baseOpacity * (0.84 + Math.sin(time * 0.42 + mesh.userData.phase) * 0.16);
+      });
+
+      pins.forEach((pin) => {
+        const bob = Math.sin(time * 1.15 + pin.phase) * 0.23;
+        pin.group.position.y = pin.baseY + bob;
+        pin.orb.position.y = 6.05 + Math.sin(time * 1.55 + pin.phase * 1.4) * 0.16;
+        pin.beamMaterial.uniforms.uTime.value = time;
+        const ringPulse = 1 + Math.sin(time * 1.9 + pin.phase) * 0.14;
+        pin.ring.scale.setScalar(ringPulse);
+        pin.ringMaterial.opacity = 0.45 + Math.sin(time * 2.1 + pin.phase) * 0.17;
+        const cycle = (time * 0.28 + pin.phase * 0.16) % 1;
+        pin.ring2.scale.setScalar(1 + cycle * 0.85);
+        pin.ringMaterial2.opacity = 0.24 * (1 - cycle);
+        const targetScale = pin.hovered ? 1.22 : 1;
+        const scaleNow = pin.group.scale.x;
+        const nextScale = scaleNow + (targetScale - scaleNow) * Math.min(1, dt * 9);
+        pin.group.scale.setScalar(nextScale);
+        pin.orbGlow.scale.setScalar(3.0 + Math.sin(time * 1.7 + pin.phase) * 0.28);
+      });
+
+      if (draftPin) {
+        draftPin.group.position.y = draftPin.baseY + Math.sin(time * 1.6) * 0.24;
+        draftPin.orb.position.y = 5.35 + Math.sin(time * 1.9) * 0.18;
+        draftPin.ring.scale.setScalar(1 + Math.sin(time * 2.1) * 0.12);
+        draftPin.glow.scale.setScalar(3.4 + Math.sin(time * 2.4) * 0.28);
+      }
+
+      districtSprites.forEach((sprite) => {
+        if (typeof sprite.userData.baseY === 'number') {
+          sprite.position.y = sprite.userData.baseY + Math.sin(time * 0.55 + (sprite.userData.phase || 0)) * 0.16;
+        }
+      });
+
+      if (peakBeacon) {
+        peakBeacon.rotation.y = time * 0.22;
+      }
+
+      if (bridgeRunner && bridgeCurve) {
+        const u = (time * 0.045) % 1;
+        const point = bridgeCurve.getPointAt(u);
+        bridgeRunner.position.copy(point);
+        bridgeRunner.position.y += 0.35;
+      }
+
+      const compassNeedle = $('#compassNeedle');
+      if (compassNeedle) {
+        const angle = Math.atan2(camera.position.x - controls.target.x, camera.position.z - controls.target.z);
+        compassNeedle.style.transform = `rotate(${angle * 180 / Math.PI}deg)`;
+      }
+
+      controls.update();
+      renderer.render(scene, camera);
+      updateTooltipPosition();
+    }
+
+    function onResize() {
+      if (!renderer || !camera) return;
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Boot                                                                */
+    /* ------------------------------------------------------------------ */
+    try {
+      initScene();
+      renderer.domElement.style.cursor = 'grab';
+      window.setTimeout(() => {
+        loader.classList.add('done');
+        window.setTimeout(() => {
+          if (!allSpots.some((spot) => spot.id === selectedSpotId)) {
+            // Keep the map quiet on first load, the pins are the invitation.
+          }
+        }, 350);
+      }, prefersReducedMotion ? 120 : 850);
+    } catch (error) {
+      console.error('Kinmen scene failed to initialize:', error);
+      loader.innerHTML = `
+        <div class="loader-inner">
+          <div class="loader-title">WEBGL INITIALIZATION FAILED</div>
+          <div class="loader-sub mono" style="margin-top:10px;max-width:340px;text-align:center;line-height:1.8;">請確認瀏覽器支援 WebGL，並允許載入 CDN 資源後重新整理。</div>
+        </div>
+      `;
+    }
+  </script>
+</body>
+</html>
