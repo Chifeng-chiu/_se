@@ -1,1 +1,72 @@
+# 軟體工程（Software Engineering）課程作業與專題總覽
 
+本儲存庫（`Chifeng-chiu/_se`）收錄軟體工程課程之每週實作作業（HW1 – HW8）與期中專題成果，涵蓋網路協定、全端開發、桌面應用、版本控制、容器化微服務、自動化測試平台、3D 互動地圖以及 AI 深偽防禦系統。
+
+- **作者**：邱祺峰（`Chifeng-chiu`）
+- **學號 / 座號**：`[請填入學號/座號]`
+- **系級**：國立金門大學 資訊工程學系
+
+---
+
+## 📂 作業與專題索引
+
+| 項目 | 主題 | 核心技術 | 狀態 | 快速連結 |
+| :--- | :--- | :--- | :---: | :--- |
+| **HW1** | `my_curl.py` 命令列網路請求工具 | Python `urllib` / `argparse` | ✅ 完成 | [前往 HW1](./HW1) |
+| **HW2** | 大學校務資訊系統 | Flask, SQLite, 原生 JS / React | ✅ 完成 | [前往 HW2](./HW2) |
+| **HW3** | NBA Tracker 桌面追蹤工具 | Python Tkinter, ESPN API, `unittest`, CI | ✅ 完成 | [前往 HW3](./HW3) |
+| **HW4** | Git 分支／合併／Fork／PR 實作紀錄 | Git, GitHub Workflow | ✅ 完成 | [前往 HW4](./HW4) |
+| **HW5** | Docker 五容器微服務架構 | Docker Compose, Nginx, Node.js, FastAPI, PostgreSQL | ✅ 完成 | [前往 HW5](./HW5) |
+| **HW6** | TestPulse Omni 自動化測試平台 | FastAPI, Playwright, Docker 沙箱, Chart.js | ✅ 完成 | [前往 HW6](./HW6) |
+| **HW7** | 金門 3D 暗空與光影足跡地圖 | Three.js, Tailwind CSS, GSAP, EXIF-js | ✅ 完成 | [前往 HW7](./HW7) |
+| **HW8** | 待補充 | — | 🚧 進行中 | [前往 HW8](./HW8) |
+| **期中專題** | **DeepShield** — AI 語音與深偽影片防禦系統 | FastAPI, React, Chrome Extension (MV3), WebSocket | ✅ 完成 | [期中說明](./期中作業) / [專案目錄](./DeepShield) |
+
+---
+
+## 🛡️ 期中專題亮點：DeepShield
+
+**DeepShield** 是一套針對 AI 語音合成與深偽（Deepfake）影片設計的雙層防禦系統：
+- **模式 A（深度鑑識平台）**：React Web Dashboard 搭配 FastAPI 後端，支援上傳 `mp4 / mp3 / wav` 檔案，輸出偽造機率、四維度評分、異常時間軸與視覺化圖表。
+- **模式 B（即時防護盾）**：Chrome Extension (MV3) 透過 WebSocket 每 2 秒即時傳送音訊、影格與字幕，動態回傳 Trust Score 與警示通知。
+- **多模態分析架構**：整合語音（30%）、視覺（30%）、防詐語意（25%）與唇音同步（15%）四大分析器，內建啟發式 baseline 並預留深度學習模型掛載介面。
+
+---
+
+## 📌 各週作業內容摘要
+
+### HW1 — `my_curl.py` 命令列網路請求工具
+使用 Python 標準函式庫模擬 `curl` 功能，支援抓取網頁 HTML、呼叫 REST API 與例外防呆，並實作 MLB 賽程 API 專屬解析器（格式化輸出客場 VS 主場、地點與賽況），附帶靜態成果展示頁。
+
+### HW2 — 大學校務資訊系統
+以 Flask + SQLite 建構後端，提供原生 HTML/JS 與 React 雙版本前端對照。完整實作學生／管理員權限分流、個人星期課表、線上加退選（含重複選課與名額檢核、軟刪除）、線上請假及管理員假單審核流程。
+
+### HW3 — NBA Tracker 桌面追蹤工具
+純 Python 標準函式庫搭配 Tkinter 打造的桌面應用，串接 ESPN 公開 API。包含 7 大功能分頁（即時比分、單場數據、賽程、戰績、球隊詳情、賽季走勢、設定）、開賽／完賽 Windows Toast 通知、迷你置頂小工具與蒙地卡羅季後賽機率模擬。專案內建 47 個免連網 `unittest`、GitHub Actions CI 與 PyInstaller 打包設定。
+
+### HW4 — Git 協作與版本控制實作
+完整記錄與驗證實務開發流程：建立 `developGitBranch` 分支、提交變更、發起 Pull Request (#1) 合併回 `main`，以及設定 Organization 私有儲存庫的 Fork 權限與個人帳號 Fork 操作。
+
+### HW5 — Docker 五容器微服務
+透過 `docker-compose.yml` 編排 5 個獨立容器：**Nginx**（靜態託管與反向代理）、**Node.js**（留言板 CRUD API）、**Python FastAPI**（系統 CPU / Memory 即時監控）、**PostgreSQL**（Volume 資料持久化）與 **Adminer**（資料庫管理後台），前端提供每 3 秒更新的狀態監控儀表板。
+
+### HW6 — TestPulse Omni 自動化測試平台
+整合六大軟體測試維度的自動化平台（FastAPI + SQLAlchemy + SQLite，搭配 Tailwind / Monaco / Chart.js 深色儀表板）：
+1. **單元測試**：`pytest` 搭配無網路、限資源（256MB / 0.5 CPU / 5s timeout）的 Docker 沙箱。
+2. **整合測試**：`httpx` 多步驟 API 鏈結、變數插值與多條件斷言。
+3. **E2E 測試**：Playwright 自動化操作、Console Error 偵測與截圖。
+4. **效能壓測**：非同步高併發測試，統計 RPS 與 p50 / p90 / p95 / p99 延遲。
+5. **資安掃描**：檢測 Security Headers、Cookie、CORS 與無害 XSS/SQLi 探測。
+6. **視覺回歸**：比對 Baseline 與 Current 畫面並標記紅色差異區域。
+
+### HW7 — 金門 3D 暗空與光影足跡地圖
+以 Three.js 建構金門 3D 地形與鄉鎮分區，內建昔果山海灘、太武山、慈湖、建功嶼與模範街等景點。支援使用者上傳照片並自動解析 EXIF（GPS 座標與拍攝參數）於 3D 地圖上定位新增足跡，搭配 GSAP 流暢運鏡動畫與玻璃擬態介面。
+
+---
+
+## 🛠️ 技術棧總覽
+
+- **後端開發**：Python (FastAPI, Flask, SQLAlchemy), Node.js, RESTful API, WebSocket
+- **前端與視覺化**：React, HTML5 / CSS3 / JavaScript, Tailwind CSS, Three.js, GSAP, Chart.js, Monaco Editor
+- **資料庫與容器化**：PostgreSQL, SQLite, Docker, Docker Compose, Nginx
+- **測試與自動化**：Playwright, `pytest`, `unittest`, GitHub Actions CI, Chrome Extension (MV3)
