@@ -28,4 +28,21 @@ pip install pyvision-bot
 - `wait_for()`／`wait_and_click()` 等待流程
 - `jitter` 隨機偏移與擬人化微延遲
 
+## 怎麼跑
+
+這是一個 **Python 函式庫**，沒有應用程式視窗。安裝後在終端機（VS Code 下方 Terminal 或 PowerShell）執行：
+
+```bash
+cd HW8/pyvision-bot
+python examples/demo.py matcher
+```
+
+`matcher` 會用合成圖片示範找圖，不需要真實螢幕，也不會動到滑鼠。其他指令：
+
+```bash
+python examples/demo.py screen            # 存一張桌面截圖
+python examples/demo.py find button.png   # 找圖，只印座標
+python examples/demo.py click button.png --yes   # 找圖並點擊
+```
+
 完整說明請見 [pyvision-bot/README.md](pyvision-bot/README.md)。

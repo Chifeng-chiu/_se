@@ -184,6 +184,40 @@ bot.swipe(200, 800, 200, 200, duration=0.5, jitter=3)
 
 這可以降低固定座標、固定節奏造成的機械感，但**不保證**能繞過任何特定服務的偵測機制。
 
+## 實際跑一次（範例程式）
+
+這個套件是 **Python 函式庫**，沒有 GUI 視窗，也不是網站。裝好之後在終端機執行 `examples/demo.py` 就能看到它在做什麼：
+
+```bash
+cd HW8/pyvision-bot
+
+# 1. 用合成圖片測試找圖，不會控制滑鼠（最安全，建議先跑這個）
+python examples/demo.py matcher
+
+# 2. 抓一張桌面截圖存成 desktop.png
+python examples/demo.py screen
+
+# 3. 在桌面上找模板，只印座標，不點擊
+python examples/demo.py find button.png
+
+# 4. 找到模板並點擊（預設只預演，加 --yes 才會真的點）
+python examples/demo.py click button.png --yes
+
+# 5. 抓 Android 裝置截圖（需先 adb devices 看得到裝置）
+python examples/demo.py adb --serial emulator-5554
+```
+
+`matcher` 的預期輸出：
+
+```text
+螢幕尺寸: (240, 320, 3)
+匹配框: (150, 80, 60, 40)
+中心點: (180, 100)
+信心: 1.0
+```
+
+要自己寫腳本時，把上面的 `from pyvision_bot import ...` 貼進一個 `.py` 檔，用 `python your_script.py` 執行即可。
+
 ## 開發與測試
 
 ```bash
